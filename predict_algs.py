@@ -2,6 +2,9 @@ import pdb #debugger
 import pandas as pd
 import numpy as np
 import random
+import math
+
+import data_manip as dm
 
 def randomPred(val_set, original_col_name, pred_col_name, predLB, predUB):
     #return the correct values and prediction values as numpy arrays
@@ -12,6 +15,23 @@ def randomPred(val_set, original_col_name, pred_col_name, predLB, predUB):
 
     return original_vals, pred_vals
 
+def PMFPred(val_set, A, B, original_data, col_i, col_j, col_target, default_C):
+    #construct prediction C
+    pred_C = np.vectorize(dm.sigmoid)(np.dot(A, B.T))
+
+    #construct actual C of valadation set (same as in training but with val_data)
+    C = pd.merge(original_data[[col_i, col_j, col_target]], val_set[[col_i, col_j, col_target]]\
+    , on=[col_i, col_j], how='left')
+    C[col_target] = C.apply(func=dm.SVDNullReplace, axis=1, args=(col_target+'_x', col_target+'_y', default_C))
+    C = C.drop([col_target+'_x', col_target+'_y'], axis=1)
+    C = pd.pivot_table(C, values=col_target, index=col_i, columns=col_j\
+    , aggfunc='sum').values
+
+    #return vectors of prediction from A*B and C_val to calc error metrics
+    original_vals = C[~np.isnan(C)].reshape(-1, 1)
+    pred_vals = pred_C[~np.isnan(C)].reshape(-1, 1)
+
+    return original_vals, pred_vals
 
 #for iterating through val_set
     # for i, row in val_set.iterrows():

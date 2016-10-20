@@ -31,9 +31,9 @@ val_iter, train_alg, train_params, pred_alg, performance_algs):
 
         #retrn a dictionary of params from train_set datagrame, train_alg fnc, dict of train_params for train_alg
         if train_params == None:
-            val_params = train_alg(train_set)
+            val_params = train_alg(train_set, val_set)
         else:
-            val_params = train_alg(train_set, **train_params)
+            val_params = train_alg(train_set, val_set, **train_params)
 
         if val_params == None:
             original_vals, pred_vals = pred_alg(val_set)
