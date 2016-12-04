@@ -69,7 +69,9 @@ def studUnitProbTimewise(groupby_key, tm_col, min_tm_col, trimmed_set):
 def createValidationSet(dataset, max_iter, prct_of_data, problem_thresh_prct, problem_thresh):
     #problem_thresh means the % of data(row count) we want in the val_set relative to total data returned
     #initialize valset and trainset, from testing problem_thresh_prct should be <= 0.5 for prct_of_data = 0.2
+
     val_set = pd.DataFrame(columns=dataset.columns)
+    test_set = pd.DataFrame(columns=dataset.columns)
     train_set = dataset
     iters = 0
 
@@ -77,20 +79,20 @@ def createValidationSet(dataset, max_iter, prct_of_data, problem_thresh_prct, pr
     while True:
         #create a validation set as a % of whole test set, first trim columns to what is needed
         #dataset with only >= problem_thresh
-        trimmed_set = removeLowerThanProblemThresh(['Anon Student Id', 'Unit'], 'Problem Name', \
+        trimmed_set = removeLowerThanProblemThresh(['Anon Student Id', 'Unit', 'Section'], 'Problem Name', \
         'Unique Problems', train_set, problem_thresh)
 
-        #get each Student-Unit_problem by their min(), list is sorted within each Student-Unit by timestamp
+        #get each Student-Unit-Section_problem by their min(), list is sorted within each Student-Unit by timestamp
         #First Transaction Time timestamp in a problem
-        min_tm_set = studUnitProbTimewise(['Anon Student Id', 'Unit', 'Problem Name'], 'First Transaction Time', \
+        min_tm_set = studUnitProbTimewise(['Anon Student Id', 'Unit', 'Section', 'Problem Name'], 'First Transaction Time', \
         'MIN_Trans_TM', trimmed_set)
 
-        print('trimmed_set size: ', trimmed_set.shape[0])
-        for stud_unit_comb in (trimmed_set[['Anon Student Id', 'Unit']].drop_duplicates().values.tolist()): #THIS LOOP IS INEFFICIENT AFTER 1ST ITER!!!
-            #temp_set are all steps/probs from a given stud_unit_comb that meets problem_thresh
-            #rand_question is a random problem from this stud_unit_comb
+        for stud_unit_section in (trimmed_set[['Anon Student Id', 'Unit', 'Section']].drop_duplicates().values.tolist()):
+            #temp_set are all steps/probs from a given stud_unit_section that meets problem_thresh
+            #rand_question is a random problem from this stud_unit_section
             temp_set = min_tm_set[\
-            (min_tm_set['Anon Student Id']==stud_unit_comb[0])&(min_tm_set['Unit']==stud_unit_comb[1])]
+            (min_tm_set['Anon Student Id']==stud_unit_section[0])&(min_tm_set['Unit']==stud_unit_section[1])\
+            &(min_tm_set['Section']==stud_unit_section[2])]
 
             #how many rows to exclude
             rows_buffered = math.ceil(problem_thresh_prct*temp_set.shape[0])
@@ -105,17 +107,18 @@ def createValidationSet(dataset, max_iter, prct_of_data, problem_thresh_prct, pr
             weights=np.append(np.zeros(rows_buffered), np.ones(rows_considered)*(1./rows_considered))\
             ).reset_index(drop=True)
 
-            #remove all steps in this stud_unit_comb that relate to rand_questions
+            #remove all steps in this stud_unit_section that relate to rand_questions
             #AND happened AFTER rand_question, first create a dataframe with these rows to remove
             #can use index[0] because we reset it above
             remove_set = min_tm_set[\
             (min_tm_set['Anon Student Id']==rand_question['Anon Student Id'].ix[0])\
             &(min_tm_set['Unit']==rand_question['Unit'].ix[0])\
+            &(min_tm_set['Section']==rand_question['Section'].ix[0])\
             &(min_tm_set['MIN_Trans_TM']>=rand_question['MIN_Trans_TM'].ix[0])]
 
             #remove step from train_set (leave only whats NOT indexed in remove_set
             train_set = pd.merge(train_set, remove_set, how='left', \
-            on = ['Anon Student Id', 'Unit', 'Problem Name'])
+            on = ['Anon Student Id', 'Unit', 'Section', 'Problem Name'])
             #all nulls are values that are NOT in remove set, so keep them, drop TM col after use
             train_set = train_set[train_set['MIN_Trans_TM'].isnull()]
             train_set = train_set.drop('MIN_Trans_TM', axis=1)
@@ -123,10 +126,27 @@ def createValidationSet(dataset, max_iter, prct_of_data, problem_thresh_prct, pr
             #add rand_question rows to val set
             val_set = val_set.append(\
             pd.merge(trimmed_set, rand_question, how='inner',\
-            on=['Anon Student Id', 'Unit', 'Problem Name'])[trimmed_set.columns]\
+            on=['Anon Student Id', 'Unit', 'Section', 'Problem Name'])[trimmed_set.columns]\
             )
 
-        print('in data_mainp, finished validation iter ', iters, ' t=', time.time()-t0)
+            #add a random problem (if any) after random one to the test set
+            if remove_set.shape[0] > 1:
+                try:
+                    test_question = min_tm_set[\
+                    (min_tm_set['Anon Student Id']==rand_question['Anon Student Id'].ix[0])\
+                    &(min_tm_set['Unit']==rand_question['Unit'].ix[0])\
+                    &(min_tm_set['Section']==rand_question['Section'].ix[0])\
+                    &(min_tm_set['MIN_Trans_TM']>rand_question['MIN_Trans_TM'].ix[0])].sample()
+                except ValueError:
+                    #skip if none!
+                    print('in data_manip, none found > tm than random_question!')
+
+                test_set = test_set.append(\
+                pd.merge(trimmed_set, test_question, how='inner',\
+                on=['Anon Student Id', 'Unit', 'Section', 'Problem Name'])[trimmed_set.columns]\
+                )
+
+        print('IN DATA_MANIP, finished validation iter ', iters, ' t=', time.time()-t0)
         iters += 1
 
         #While the val_set has not not exceeded or equaled threshold of total data retained
@@ -134,93 +154,17 @@ def createValidationSet(dataset, max_iter, prct_of_data, problem_thresh_prct, pr
             break
 
     #reset val_set index
+    train_set = train_set.reset_index(drop=True)
     val_set = val_set.reset_index(drop=True)
+    test_set = test_set.reset_index(drop=True)
 
     #calculate loss of data
-    rows_retained = train_set.shape[0] + val_set.shape[0]
-    rows_lost = dataset.shape[0] - train_set.shape[0] - val_set.shape[0]
+    rows_retained = train_set.shape[0] + val_set.shape[0] + test_set.shape[0]
+    rows_lost = dataset.shape[0] - train_set.shape[0] - val_set.shape[0] - test_set.shape[0]
     prct_lost = rows_lost/dataset.shape[0]
-    prct_ratio_actl = (val_set.shape[0]/(val_set.shape[0]+train_set.shape[0]))
+    prct_ratio_val_to_train = (val_set.shape[0]/(val_set.shape[0]+train_set.shape[0]))
 
-    return val_set, train_set, rows_retained, rows_lost, prct_lost, prct_ratio_actl
-
-def createValidationSetV2(dataset, max_iter, prct_of_data, problem_thresh_prct, problem_thresh):
-    #problem_thresh means the % of data(row count) we want in the val_set relative to total data returned
-    #initialize valset and trainset, from testing problem_thresh_prct should be <= 0.5 for prct_of_data = 0.2
-    val_set = pd.DataFrame(columns=dataset.columns)
-    train_set = dataset
-    iters = 0
-
-    t0 = time.time()
-    while True:
-        #create a validation set as a % of whole test set, first trim columns to what is needed
-        #dataset with only >= problem_thresh
-        trimmed_set = removeLowerThanProblemThresh(['Anon Student Id', 'Unit'], 'Problem Name', \
-        'Unique Problems', train_set, problem_thresh)
-
-        #get each Student-Unit_problem by their min(), list is sorted within each Student-Unit by timestamp
-        #First Transaction Time timestamp in a problem
-        min_tm_set = studUnitProbTimewise(['Anon Student Id', 'Unit', 'Problem Name'], 'First Transaction Time', \
-        'MIN_Trans_TM', trimmed_set)
-
-        print('trimmed_set size: ', trimmed_set.shape[0])
-        for stud_unit_comb in (trimmed_set[['Anon Student Id', 'Unit']].drop_duplicates().values.tolist()): #THIS LOOP IS INEFFICIENT AFTER 1ST ITER!!!
-            #temp_set are all steps/probs from a given stud_unit_comb that meets problem_thresh
-            #rand_question is a random problem from this stud_unit_comb
-            temp_set = min_tm_set[\
-            (min_tm_set['Anon Student Id']==stud_unit_comb[0])&(min_tm_set['Unit']==stud_unit_comb[1])]
-
-            #how many rows to exclude
-            rows_buffered = math.ceil(problem_thresh_prct*temp_set.shape[0])
-            rows_considered = temp_set.shape[0] - rows_buffered
-
-            #check if no rows to be considered
-            if rows_considered == 0:
-                break
-
-            #only choose from back 100-problem_thresh_prct of rows with equal chance using weights
-            rand_question = temp_set.sample(\
-            weights=np.append(np.zeros(rows_buffered), np.ones(rows_considered)*(1./rows_considered))\
-            ).reset_index(drop=True)
-
-            #remove all steps in this stud_unit_comb that relate to rand_questions
-            #AND happened AFTER rand_question, first create a dataframe with these rows to remove
-            #can use index[0] because we reset it above
-            remove_set = min_tm_set[\
-            (min_tm_set['Anon Student Id']==rand_question['Anon Student Id'].ix[0])\
-            &(min_tm_set['Unit']==rand_question['Unit'].ix[0])\
-            &(min_tm_set['MIN_Trans_TM']>=rand_question['MIN_Trans_TM'].ix[0])]
-
-            #remove step from train_set (leave only whats NOT indexed in remove_set
-            train_set = pd.merge(train_set, remove_set, how='left', \
-            on = ['Anon Student Id', 'Unit', 'Problem Name'])
-            #all nulls are values that are NOT in remove set, so keep them, drop TM col after use
-            train_set = train_set[train_set['MIN_Trans_TM'].isnull()]
-            train_set = train_set.drop('MIN_Trans_TM', axis=1)
-
-            #add rand_question rows to val set
-            val_set = val_set.append(\
-            pd.merge(trimmed_set, rand_question, how='inner',\
-            on=['Anon Student Id', 'Unit', 'Problem Name'])[trimmed_set.columns]\
-            )
-
-        print('in data_mainp, finished validation iter ', iters, ' t=', time.time()-t0)
-        iters += 1
-
-        #While the val_set has not not exceeded or equaled threshold of total data retained
-        if ((val_set.shape[0]/(val_set.shape[0]+train_set.shape[0])) >= prct_of_data) or (iters >= max_iter):
-            break
-
-    #reset val_set index
-    val_set = val_set.reset_index(drop=True)
-
-    #calculate loss of data
-    rows_retained = train_set.shape[0] + val_set.shape[0]
-    rows_lost = dataset.shape[0] - train_set.shape[0] - val_set.shape[0]
-    prct_lost = rows_lost/dataset.shape[0]
-    prct_ratio_actl = (val_set.shape[0]/(val_set.shape[0]+train_set.shape[0]))
-
-    return val_set, train_set, rows_retained, rows_lost, prct_lost, prct_ratio_actl
+    return train_set, val_set, test_set, rows_retained, rows_lost, prct_lost, prct_ratio_val_to_train
 
 def SVDNullReplace(row, default_col, cond_col, default_C):
     if(np.isnan(row[cond_col])):
@@ -230,4 +174,9 @@ def SVDNullReplace(row, default_col, cond_col, default_C):
         return row[default_col]
 
 def sigmoid(z):
-    return 1/(1+math.exp(-z))
+    try:
+        ans = 1/(1+math.exp(-z))
+    except OverflowError:
+        ans = float('inf')
+
+    return ans
