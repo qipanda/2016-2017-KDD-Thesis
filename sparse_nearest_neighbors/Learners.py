@@ -21,7 +21,7 @@ class Learner(object):
     def fit(self, X):
         print('using parent Learner fit method')
 
-    def predict(self, X_answers):
+    def pred(self, X_answers):
         print('using parent Learner predict method')
         return np.zeros(0), np.zeros(0)
 
@@ -61,12 +61,23 @@ class NN_cos_Learner(Learner):
         '''
         #get the prediction matrix that will be (mxm)dot(mxn) giving (mxn)
         pred_matrix = sparse.csc_matrix.dot(self.sim, self.X.tocsc())
-        weight_divisor = np.repeat(np.sum(self.sim, axis=1), pred_matrix.shape[1]).reshape(-1, pred_matrix.shape[1])
+
+        #make weight_divisor so that it only includes weights that had a value
+        weights_rows = self.X.row
+        weights_cols = self.X.col
+        weights_vals = np.ones(self.X.row.shape)
+        weight_divisor_idx = coo_matrix((weights_vals, (weights_rows, weights_cols)),\
+            shape=(pred_matrix.shape))
+        weight_divisor = sparse.csc_matrix.dot(self.sim, weight_divisor_idx.tocsc())
+
+        #divide by the appropriate sum of weights (only the ones used)
         pred_matrix = pred_matrix/weight_divisor
 
         #if any nan's from 0 division fill with the average
         pred_matrix[np.isnan(pred_matrix)] = np.mean(self.X.data)
 
+        #store predictions for the appropriate X_answers indexes in a vector
+        #and the actual values to return
         preds = pred_matrix[X_answers.row, X_answers.col] >= threshold
         actls = X_answers.data
 
@@ -76,58 +87,101 @@ class Uniform_Random_Learner(Learner):
     def __str__(self):
         return 'Uniform_Random_Learner'
 
-    def predict(self, pred_df, pred_col):
-        '''
-        this subclass simply takes in a dataframe, and predicts randomly [0,1] and
-        calls the new column pred_col + '_pred'. No need to fit anything here
-        '''
-        pred_df[pred_col + '_pred'] = np.random.uniform(0, 1, pred_df.shape[0])
-        self.predictions = pred_df
+    def pred(self, X_answers, threshold):
+        preds = np.random.uniform(0, 1, X_answers.data.shape) >= threshold
+        actls = X_answers.data
 
-        return self.predictions.copy(), pred_col, pred_col+'_pred'
+        return preds, actls
 
 class Gloabl_Avg_Learner(Learner):
+    def __init__(self, df=None, X=None):
+        super().__init__(df)
+        self.X = X
+
     def __str__(self):
         return 'Gloabl_Avg_Learner'
 
-    def predict(self, pred_df, pred_col):
-        '''
-        this subclass simply takes the global average of the pred_col and uses that
-        as all predictions from the train_df
-        '''
-        pred_df[pred_col + '_pred'] = self.train_df[pred_col].mean()
-        self.predictions = pred_df
+    def fit(self, X):
+        self.X = X
 
-        return self.predictions.copy(), pred_col, pred_col+'_pred'
+    def pred(self, X_answers, threshold):
+        preds = np.ones(X_answers.data.shape)*np.mean(self.X.data) >= threshold
+        actls = X_answers.data
 
-class Within_Col_Avg_Learner(Learner):
-    def __init__(self, df=None, within_col=None):
+        return preds, actls
+
+class Within_XCol_Avg_Learner(Learner):
+    def __init__(self, df=None, X=None):
         super().__init__(df)
-        if within_col is None:
-            within_col = 'NONE ASSIGNED'
-        self.within_col = within_col
+        self.X = X
 
     def __str__(self):
-        if isinstance(self.within_col, str):
-            return 'Within_Col_Avg_Learner | within_col: ' + self.within_col
-        elif isinstance(self.within_col, list):
-            return 'Within_Col_Avg_Learner | within_col: ' + str(self.within_col)
+        return 'Within_XCol_Avg_Learner'
 
-    def predict(self, pred_df, pred_col):
-        '''
-        this subclass predicts based on the average of all values in each within_col
-        Can handle within_col's that are singular (just string) or multiple columns
-        (inputted as a list of strings)
-        '''
-        within_means = self.train_df.groupby(self.within_col).agg({pred_col:pd.Series.mean})
+    def fit(self, X):
+        self.X = X
 
-        within_means = within_means.reset_index()
-        if isinstance(self.within_col, str):
-            within_means.columns = [self.within_col, pred_col + '_pred']
-        elif isinstance(self.within_col, list):
-            within_means.columns = [*self.within_col, pred_col + '_pred']
+    def pred(self, X_answers, threshold):
+        '''predictions for X_answers are the average of the columns in self.X'''
+        import ipdb; ipdb.set_trace()
+        #first find matrix size X.shape that holds 1 for where there is a value
+        #in the sparse self.X
+        X_val_idx = coo_matrix((np.ones(self.X.data.shape), (self.X.row, self.X.col)),\
+            shape=(self.X.shape))
 
-        pred_df = pd.merge(pred_df, within_means, on=self.within_col, how='left')
-        self.predictions = pred_df
+        #sum across columns (by collapsing rows) to see how many elements are
+        #truly in each column of the sparse self.X
+        X_col_counts = X_val_idx.sum(axis=0)
 
-        return self.predictions.copy(), pred_col, pred_col+'_pred'
+        #now get the mean for each col
+        X_col_means = np.asarray(self.X.sum(axis=0)/X_col_counts).reshape(-1)
+
+        #assign nan values (cols that didn't have any vals in self.X) to glb_avg
+        X_col_means[np.isnan(X_col_means)] = np.mean(self.X.data)
+
+        #get a predictions matrix by extending X_col_means by the number of rows
+        #in self.X
+        pred_matrix = np.tile(X_col_means, self.X.shape[0]).reshape(self.X.shape)
+
+        preds = pred_matrix[X_answers.row, X_answers.col] >= threshold
+        actls = X_answers.data
+
+        return preds, actls
+
+class Within_XRow_Avg_Learner(Learner):
+    def __init__(self, df=None, X=None):
+        super().__init__(df)
+        self.X = X
+
+    def __str__(self):
+        return 'Within_XRow_Avg_Learner'
+
+    def fit(self, X):
+        self.X = X
+
+    def pred(self, X_answers, threshold):
+        '''predictions for X_answers are the average of the columns in self.X'''
+        import ipdb; ipdb.set_trace()
+        #first find matrix size X.shape that holds 1 for where there is a value
+        #in the sparse self.X
+        X_val_idx = coo_matrix((np.ones(self.X.data.shape), (self.X.row, self.X.col)),\
+            shape=(self.X.shape))
+
+        #sum across rows (by collapsing cols) to see how many elements are truly
+        #in each row of the sparse self.X
+        X_row_counts = X_val_idx.sum(axis=1)
+
+        #now get the mean for each row
+        X_row_means = np.asarray(self.X.sum(axis=1)/X_row_counts).reshape(-1)
+
+        #assign nan values (rows that didn't have any vals in self.X) to glb_avg
+        X_row_means[np.isnan(X_row_means)] = np.mean(self.X.data)
+
+        #get a prediction matrix by extending X_row_means by the number of cols
+        #in self.X
+        pred_matrix = np.repeat(X_row_means, self.X.shape[1]).reshape(self.X.shape)
+
+        preds = pred_matrix[X_answers.row, X_answers.col] >= threshold
+        actls = X_answers.data
+
+        return preds, actls

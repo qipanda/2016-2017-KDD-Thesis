@@ -12,34 +12,34 @@ import matplotlib.pyplot as plt
 this script is meant to show the results of testing on single KC data
 '''
 
-'''Prelim A: Load single KC data'''
-single_KC_data = pd.read_pickle('/Users/qipanda/Documents/2016-2017_KDD_Thesis/education_data'+\
-    '/bridge_to_algebra_2008_2009/bridge_0809_KC.pkl')
-
-test_df = pd.DataFrame(
-    {
-        'Anon Student Id':['A', 'A', 'A', 'A', 'A', 'B', 'B', 'B', 'C', 'C', 'C', 'C', 'C'],
-        'Problem Name':['P1', 'P1', 'P2', 'P2', 'P1', 'P1', 'P2', 'P2', 'P1', 'P1', 'P1', 'P1', 'P2'],
-        'Step Name':['S1', 'S1', 'S1', 'S2', 'S2', 'S1', 'S3', 'S3', 'S1', 'S1', 'S1', 'S1', 'S3'],
-        # 'First Transaction Time Rank':[1, 1, 2, 1, 2, 1, 2, 1, 2, 3],
-        'First Transaction Time':['2008-09-01', '2008-09-02', '2008-09-03', '2008-09-04',\
-            '2008-09-05', '2008-09-01', '2008-09-02', '2008-09-03', '2008-09-01', '2008-09-02',\
-            '2008-09-03', '2008-09-04', '2008-09-05'],
-        'Correct First Attempt':[0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1],
-        'Problem View':[1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 3, 4, 1]
-    }
-)
-
-dm = DataManipulators.DataManipulator(df=single_KC_data)
-
-'''Prelim B: assign tm_ranks to the data'''
-assign_rel_tm_params = {
-    'granularity_grp':  ['Anon Student Id', 'Problem Name', 'Problem View'],
-    'time_within_col':  'Anon Student Id',
-    'time_col':         'First Transaction Time',
-    'tm_order_col':     'First Transaction Time Order'
-}
-dm.assign_rel_tm(**assign_rel_tm_params)
+# '''Prelim A: Load single KC data'''
+# single_KC_data = pd.read_pickle('/Users/qipanda/Documents/2016-2017_KDD_Thesis/education_data'+\
+#     '/bridge_to_algebra_2008_2009/bridge_0809_KC.pkl')
+#
+# test_df = pd.DataFrame(
+#     {
+#         'Anon Student Id':['A', 'A', 'A', 'A', 'A', 'B', 'B', 'B', 'C', 'C', 'C', 'C', 'C'],
+#         'Problem Name':['P1', 'P1', 'P2', 'P2', 'P1', 'P1', 'P2', 'P2', 'P1', 'P1', 'P1', 'P1', 'P2'],
+#         'Step Name':['S1', 'S1', 'S1', 'S2', 'S2', 'S1', 'S3', 'S3', 'S1', 'S1', 'S1', 'S1', 'S3'],
+#         # 'First Transaction Time Rank':[1, 1, 2, 1, 2, 1, 2, 1, 2, 3],
+#         'First Transaction Time':['2008-09-01', '2008-09-02', '2008-09-03', '2008-09-04',\
+#             '2008-09-05', '2008-09-01', '2008-09-02', '2008-09-03', '2008-09-01', '2008-09-02',\
+#             '2008-09-03', '2008-09-04', '2008-09-05'],
+#         'Correct First Attempt':[0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1],
+#         'Problem View':[1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 3, 4, 1]
+#     }
+# )
+#
+# dm = DataManipulators.DataManipulator(df=single_KC_data)
+#
+# '''Prelim B: assign tm_ranks to the data'''
+# assign_rel_tm_params = {
+#     'granularity_grp':  ['Anon Student Id', 'Problem Name', 'Problem View'],
+#     'time_within_col':  'Anon Student Id',
+#     'time_col':         'First Transaction Time',
+#     'tm_order_col':     'First Transaction Time Order'
+# }
+# dm.assign_rel_tm(**assign_rel_tm_params)
 
 # '''1.) Preprocess features in DM'''
 # assign_2D_sparse_ftrs_params = {
@@ -72,7 +72,7 @@ dm.assign_rel_tm(**assign_rel_tm_params)
 # lu.save_pickle('test_preprocessed_DM', dm, 'saved_ftrs')
 
 '''1.) Preprocessing for based X_ftrs, X_views done, load them'''
-# dm = lu.load_pickle('test_preprocessed_DM', 'saved_ftrs')
+dm = lu.load_pickle('test_preprocessed_DM', 'saved_ftrs')
 import ipdb; ipdb.set_trace()
 load_params = {
     'ftr_name':'X_correct',
@@ -100,7 +100,61 @@ load_params = {
 dm.load_2D_sparse_ftrs(**load_params)
 
 
-'''2.) Test for cosine_sim, 0/1 encoding'''
+'''2.) Test Baselines'''
+#Uniform_Random_Learner
+test_2D_sparse_params = {
+    'Learner':Learners.Uniform_Random_Learner,
+    'tm_orders_totest':20,
+    'ftr_name':'X_correct_latest',
+    'answers_name':'X_correct',
+    'fit_params':{},
+    'pred_params':{
+        'threshold':0.5
+    }
+}
+nn_uniform_results = dm.test_2D_sparse(**test_2D_sparse_params)
+
+#Global_Average_Learner
+test_2D_sparse_params = {
+    'Learner':Learners.Gloabl_Avg_Learner,
+    'tm_orders_totest':20,
+    'ftr_name':'X_correct_latest',
+    'answers_name':'X_correct',
+    'fit_params':{},
+    'pred_params':{
+        'threshold':0.5
+    }
+}
+nn_glb_avg_results = dm.test_2D_sparse(**test_2D_sparse_params)
+
+#Within_XCol_Avg_Learner (within each Problem-Step)
+test_2D_sparse_params = {
+    'Learner':Learners.Within_XCol_Avg_Learner,
+    'tm_orders_totest':20,
+    'ftr_name':'X_correct_latest',
+    'answers_name':'X_correct',
+    'fit_params':{},
+    'pred_params':{
+        'threshold':0.5
+    }
+}
+nn_within_col_results = dm.test_2D_sparse(**test_2D_sparse_params)
+
+#Within_XRow_Avg_Learner (within each Student)
+test_2D_sparse_params = {
+    'Learner':Learners.Within_XRow_Avg_Learner,
+    'tm_orders_totest':20,
+    'ftr_name':'X_correct_latest',
+    'answers_name':'X_correct',
+    'fit_params':{},
+    'pred_params':{
+        'threshold':0.5
+    }
+}
+nn_within_row_results = dm.test_2D_sparse(**test_2D_sparse_params)
+
+'''3.) Test NN methods'''
+#NN_cosine with 0/1 encoding in X
 test_2D_sparse_params = {
     'Learner':Learners.NN_cos_Learner,
     'tm_orders_totest':20,
@@ -111,10 +165,20 @@ test_2D_sparse_params = {
         'threshold':0.5
     }
 }
-nn_01_results = dm.test_2D_sparse(**test_2D_sparse_params)
-print('hi')
+nn_cosine_results = dm.test_2D_sparse(**test_2D_sparse_params)
+
+#NN_cosine with -1/0/1 encoding in X (-1 for incorrects instead of 0)
 #TODO calculate/graph results
 
+
+
+
+
+
+
+
+
+'''old code to discard/replace below'''
 # '''Preprocess data for NN'''
 # preprocess_params = {
 #     'sim_col':'Anon Student Id',

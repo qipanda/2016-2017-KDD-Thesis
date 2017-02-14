@@ -176,7 +176,6 @@ class DataManipulator(object):
         acc_results = []
 
         for t_cur in range(tm_orders_totest):
-            print('t_cur = {}'.format(t_cur))
             learner.fit(self.sparse_ftrs[ftr_name][t_cur], **fit_params)
             preds, actls = learner.pred(self.sparse_ftrs[answers_name][t_cur+1], **pred_params)
 
@@ -186,6 +185,7 @@ class DataManipulator(object):
             fp = np.sum(preds[actls==1] != actls[actls==1])
             fn = np.sum(preds[actls==0] != actls[actls==0])
             acc = (tp+tn)/(tp+tn+fp+fn)
+            print('t_cur = {}| acc = {}'.format(t_cur, acc))
 
             #insert results
             t_cur_results.append(t_cur)
