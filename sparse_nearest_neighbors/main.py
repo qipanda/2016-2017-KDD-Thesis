@@ -1,6 +1,5 @@
 import DataManipulators
 import Learners
-import Evaluators
 import loading_util as lu
 import graphing_util as gu
 
@@ -73,7 +72,8 @@ this script is meant to show the results of testing on single KC data
 
 '''1.) Preprocessing for based X_ftrs, X_views done, load them'''
 dm = lu.load_pickle('test_preprocessed_DM', 'saved_ftrs')
-import ipdb; ipdb.set_trace()
+tm_orders_totest = 50
+
 load_params = {
     'ftr_name':'X_correct',
     'filenames':'X_correct',
@@ -99,25 +99,25 @@ load_params = {
 }
 dm.load_2D_sparse_ftrs(**load_params)
 
-
+test_results = []
 '''2.) Test Baselines'''
 #Uniform_Random_Learner
-test_2D_sparse_params = {
-    'Learner':Learners.Uniform_Random_Learner,
-    'tm_orders_totest':20,
-    'ftr_name':'X_correct_latest',
-    'answers_name':'X_correct',
-    'fit_params':{},
-    'pred_params':{
-        'threshold':0.5
-    }
-}
-nn_uniform_results = dm.test_2D_sparse(**test_2D_sparse_params)
+# test_2D_sparse_params = {
+#     'Learner':Learners.Uniform_Random_Learner,
+#     'tm_orders_totest':tm_orders_totest,
+#     'ftr_name':'X_correct_latest',
+#     'answers_name':'X_correct',
+#     'fit_params':{},
+#     'pred_params':{
+#         'threshold':0.5
+#     }
+# }
+# nn_uniform_results = dm.test_2D_sparse(**test_2D_sparse_params)
 
 #Global_Average_Learner
 test_2D_sparse_params = {
     'Learner':Learners.Gloabl_Avg_Learner,
-    'tm_orders_totest':20,
+    'tm_orders_totest':tm_orders_totest,
     'ftr_name':'X_correct_latest',
     'answers_name':'X_correct',
     'fit_params':{},
@@ -125,12 +125,12 @@ test_2D_sparse_params = {
         'threshold':0.5
     }
 }
-nn_glb_avg_results = dm.test_2D_sparse(**test_2D_sparse_params)
+test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
 
 #Within_XCol_Avg_Learner (within each Problem-Step)
 test_2D_sparse_params = {
     'Learner':Learners.Within_XCol_Avg_Learner,
-    'tm_orders_totest':20,
+    'tm_orders_totest':tm_orders_totest,
     'ftr_name':'X_correct_latest',
     'answers_name':'X_correct',
     'fit_params':{},
@@ -138,12 +138,12 @@ test_2D_sparse_params = {
         'threshold':0.5
     }
 }
-nn_within_col_results = dm.test_2D_sparse(**test_2D_sparse_params)
+test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
 
 #Within_XRow_Avg_Learner (within each Student)
 test_2D_sparse_params = {
     'Learner':Learners.Within_XRow_Avg_Learner,
-    'tm_orders_totest':20,
+    'tm_orders_totest':tm_orders_totest,
     'ftr_name':'X_correct_latest',
     'answers_name':'X_correct',
     'fit_params':{},
@@ -151,13 +151,13 @@ test_2D_sparse_params = {
         'threshold':0.5
     }
 }
-nn_within_row_results = dm.test_2D_sparse(**test_2D_sparse_params)
+test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
 
 '''3.) Test NN methods'''
 #NN_cosine with 0/1 encoding in X
 test_2D_sparse_params = {
     'Learner':Learners.NN_cos_Learner,
-    'tm_orders_totest':20,
+    'tm_orders_totest':tm_orders_totest,
     'ftr_name':'X_correct_latest',
     'answers_name':'X_correct',
     'fit_params':{},
@@ -165,71 +165,44 @@ test_2D_sparse_params = {
         'threshold':0.5
     }
 }
-nn_cosine_results = dm.test_2D_sparse(**test_2D_sparse_params)
+test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+
+#NN cosine with 0/1 encoding in X but simdiags = 0
+test_2D_sparse_params = {
+    'Learner':Learners.NN_cos_noselfsim_Learner,
+    'tm_orders_totest':tm_orders_totest,
+    'ftr_name':'X_correct_latest',
+    'answers_name':'X_correct',
+    'fit_params':{},
+    'pred_params':{
+        'threshold':0.5
+    }
+}
+test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
 
 #NN_cosine with -1/0/1 encoding in X (-1 for incorrects instead of 0)
-#TODO calculate/graph results
-
-
-
-
-
-
-
-
-
-'''old code to discard/replace below'''
-# '''Preprocess data for NN'''
-# preprocess_params = {
-#     'sim_col':'Anon Student Id',
-#     'grp_key':['Problem Name', 'Step Name'],
-#     'tm_col':'First Transaction Time Rank',
-#     'attempt_col':'Problem View',
-#     'pred_col':'Correct First Attempt'
-# }
-# predict_params = {
-#     't_cur':0,
-#     'thresh':0.0
-# }
-# nn = Learners.NN_Learner(dm.df)
-# nn.preprocess(**preprocess_params)
-#
-# '''Testing across tm_ranges and getting True Pos, False Pos, True Neg, False Neg'''
+test_2D_sparse_params = {
+    'Learner':Learners.NN_cos_encode_wrong_Learner,
+    'tm_orders_totest':tm_orders_totest,
+    'ftr_name':'X_correct_latest',
+    'answers_name':'X_correct',
+    'fit_params':{
+        'encode_wrong':-1.0
+    },
+    'pred_params':{
+        'threshold':0.0
+    }
+}
+test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
 # import ipdb; ipdb.set_trace()
-#
-# results = {'t_cur':[], 'TP':[], 'FP':[], 'TN':[], 'FN':[], 'Total':[]}
-# t_range = range(150)
-# for t_cur in t_range:
-#     print(t_cur)
-#     predict_params['t_cur'] = t_cur
-#     preds, actls = nn.predict(**predict_params)
-#     results['t_cur'].append(t_cur)
-#     results['TP'].append(np.sum(preds[preds==True] == actls[preds==True]))
-#     results['FP'].append(np.sum(preds[preds==True] != actls[preds==True]))
-#     results['TN'].append(np.sum(preds[preds==False] == actls[preds==False]))
-#     results['FN'].append(np.sum(preds[preds==False] != actls[preds==False]))
-#     results['Total'].append(preds.shape[0])
-# import ipdb; ipdb.set_trace()
-# # lu.save_pickle(filename='NN_sensitivity_150', value=results)
-# results = lu.load_pickle(filename='NN_sensitivity_150')
-#
-# results_df = pd.DataFrame(results)
-# results_df['Accuracy'] = (results_df['TP'] + results_df['TN'])/results_df['Total']
-# results_df['Precision'] = results_df['TP']/(results_df['TP'] + results_df['FP'])
-# results_df['Recall'] = results_df['TP']/(results_df['TP'] + results_df['FN'])
-#
-# results_df['TP_prct'] = results_df['TP']/results_df['Total']
-# results_df['FP_prct'] = results_df['FP']/results_df['Total']
-# results_df['TN_prct'] = results_df['TN']/results_df['Total']
-# results_df['FN_prct'] = results_df['FN']/results_df['Total']
-#
-# plt.plot(range(150), results_df['TP_prct'], color='g', label='TP_prct')
-# plt.plot(range(150), results_df['FP_prct'], color='r', label='FP_prct')
-# plt.plot(range(150), results_df['TN_prct'], color='g', label='TN_prct', ls='--')
-# plt.plot(range(150), results_df['FN_prct'], color='r', label='FN_prct', ls='--')
-# plt.plot(range(150), results_df['Accuracy'], color='b', label='Acc.')
-# plt.legend(loc='best')
-# plt.xlabel('Time')
-# plt.ylabel('Percentage (%)')
-# plt.grid()
-# plt.show()
+
+'''#TODO calculate/graph results'''
+plot_test_2D_sparse_results_params = {
+    'results':test_results,
+    'x_range_col':'t_cur',
+    'label_col':'Learner Name',
+    'value_cols':['Accuracy', 'Positive Predictive Value', 'Negative Predictive Value',\
+        'True Positive Rate', 'True Negative Rate']
+}
+gu.plot_test_2D_sparse_results(**plot_test_2D_sparse_results_params)
+lu.save_pickle('test_results_3methods_50tm', test_results, 'results')

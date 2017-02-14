@@ -173,7 +173,12 @@ class DataManipulator(object):
         tn_results = []
         fp_results = []
         fn_results = []
+
         acc_results = []
+        ppv_results = []
+        npv_results = []
+        tpr_results = []
+        tnr_results = []
 
         for t_cur in range(tm_orders_totest):
             learner.fit(self.sparse_ftrs[ftr_name][t_cur], **fit_params)
@@ -184,7 +189,12 @@ class DataManipulator(object):
             tn = np.sum(preds[actls==0] == actls[actls==0])
             fp = np.sum(preds[actls==1] != actls[actls==1])
             fn = np.sum(preds[actls==0] != actls[actls==0])
+
             acc = (tp+tn)/(tp+tn+fp+fn)
+            ppv = tp/(tp+fp) #positive predictive value (Precision)
+            npv = tn/(tn+fn) #negative predictive value
+            tpr = tp/(tp+fn) #true pos rate (out of all pos, how many got) (Recall)
+            tnr = tn/(tn+fp) #true neg rate (out of all neg, how many got) (Specificity)
             print('t_cur = {}| acc = {}'.format(t_cur, acc))
 
             #insert results
@@ -196,7 +206,12 @@ class DataManipulator(object):
             tn_results.append(tn)
             fp_results.append(fp)
             fn_results.append(fn)
+
             acc_results.append(acc)
+            ppv_results.append(ppv)
+            npv_results.append(npv)
+            tpr_results.append(tpr)
+            tnr_results.append(tnr)
 
         #store results in a dataframe
         results = pd.DataFrame({
@@ -208,7 +223,11 @@ class DataManipulator(object):
             'TN':tn_results,
             'FP':fp_results,
             'FN':fn_results,
-            'Accuracy':acc_results
+            'Accuracy':acc_results,
+            'Positive Predictive Value':ppv_results,
+            'Negative Predictive Value':npv_results,
+            'True Positive Rate':tpr_results,
+            'True Negative Rate':tnr_results
         })
 
         return results

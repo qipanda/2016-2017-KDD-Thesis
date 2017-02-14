@@ -1,9 +1,37 @@
 
 import pandas as pd
+import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 import math
+
+def plot_test_2D_sparse_results(results, x_range_col, label_col, value_cols):
+    '''
+    Inputs:
+        [results] = list of dataframes that contain the results
+        label_col = name of the col seperate difference methods
+        [value_cols] = list of different valued graphs to plot
+    '''
+    #get the xrange from an arbitrary result (all should be same)
+    x_range = results[0][x_range_col]
+
+    for i, value in enumerate(value_cols):
+        plt.figure(i)
+        for result in results:
+            y_range = result[value]
+            plt.plot(x_range, y_range, label=result[label_col][0])
+
+        plt.legend(loc='best')
+        plt.xlabel(x_range_col)
+        plt.ylabel(value)
+        plt.xticks(x_range)
+        plt.yticks(0+np.arange(26)*0.04) #% from 70% to 100%
+        plt.title('{} by {}'.format(value, x_range_col))
+        plt.grid()
+        plt.show()
+
+    print('graphing complete')
 
 def to_percent(x, position):
     # Ignore the passed in position. This has the effect of scaling the default

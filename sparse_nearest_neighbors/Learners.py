@@ -26,13 +26,14 @@ class Learner(object):
         return np.zeros(0), np.zeros(0)
 
 class NN_cos_Learner(Learner):
-    def __init__(self, df=None, X=None, sim=None):
+    def __init__(self, df=None, X=None, sim=None, threshold=None):
         super().__init__(df)
         self.sim = sim
         self.X = X
+        self.threshold = threshold
 
     def __str__(self):
-        return 'NN_Learner'
+        return 'NN_cos_Learner|thresh={}'.format(self.threshold)
 
     def fit(self, X):
         '''
@@ -45,8 +46,6 @@ class NN_cos_Learner(Learner):
         #what if an X of all 0's? it will default to 0 sim
         self.X = X
         self.sim = cosine_similarity(X, X)
-        #assign diagonals to 1 to avoid dividing by 0
-        # np.fill_diagonal(self.sim, 1)
 
     def pred(self, X_answers, threshold):
         '''
@@ -59,6 +58,145 @@ class NN_cos_Learner(Learner):
             preds: ndarray of size filled_values in X_answers of the predictions
             actls: ndarray of size filled_values in X_answers of actual labels
         '''
+        #assign threshold purely for labelling
+        self.threshold = threshold
+
+        #get the prediction matrix that will be (mxm)dot(mxn) giving (mxn)
+        pred_matrix = sparse.csc_matrix.dot(self.sim, self.X.tocsc())
+
+        #make weight_divisor so that it only includes weights that had a value
+        weights_rows = self.X.row
+        weights_cols = self.X.col
+        weights_vals = np.ones(self.X.row.shape)
+        weight_divisor_idx = coo_matrix((weights_vals, (weights_rows, weights_cols)),\
+            shape=(pred_matrix.shape))
+        weight_divisor = sparse.csc_matrix.dot(self.sim, weight_divisor_idx.tocsc())
+
+        #divide by the appropriate sum of weights (only the ones used)
+        pred_matrix = pred_matrix/weight_divisor
+
+        #if any nan's from 0 division fill with the average
+        pred_matrix[np.isnan(pred_matrix)] = np.mean(self.X.data)
+
+        #store predictions for the appropriate X_answers indexes in a vector
+        #and the actual values to return
+        preds = pred_matrix[X_answers.row, X_answers.col] >= threshold
+        actls = X_answers.data
+
+        return preds, actls
+
+class NN_cos_noselfsim_Learner(Learner):
+    def __init__(self, df=None, X=None, sim=None, threshold=None):
+        super().__init__(df)
+        self.sim = sim
+        self.X = X
+        self.threshold = threshold
+
+    def __str__(self):
+        return 'NN_cos_noselfsim_Learner|thresh={}'.format(self.threshold)
+
+    def fit(self, X):
+        '''
+        Calculate the cosine similarity matrix
+        Inputs:
+            X: mxn coo_sparse matrix, m = each sample, n = # of features
+        Ouputs:
+            sim: mxm similarity dense matrix
+        '''
+        #what if an X of all 0's? it will default to 0 sim
+        self.X = X
+        self.sim = cosine_similarity(X, X)
+
+        #convert diagonal values to 0 to prevent the self student to contribute
+        #to the prediction
+        np.fill_diagonal(self.sim, 0)
+
+    def pred(self, X_answers, threshold):
+        '''
+        using self.sim, predict on X_answers
+        Inputs:
+            X_answers: mxn coo_sparse matrix, m = each sample, n = # of features
+                ***filled parts of the sparse matrix are what we are predicting
+                for, labels are all binary 0/1 (False/True)
+        Outputs:
+            preds: ndarray of size filled_values in X_answers of the predictions
+            actls: ndarray of size filled_values in X_answers of actual labels
+        '''
+        #assign threshold purely for labelling
+        self.threshold = threshold
+
+        #get the prediction matrix that will be (mxm)dot(mxn) giving (mxn)
+        pred_matrix = sparse.csc_matrix.dot(self.sim, self.X.tocsc())
+
+        #make weight_divisor so that it only includes weights that had a value
+        weights_rows = self.X.row
+        weights_cols = self.X.col
+        weights_vals = np.ones(self.X.row.shape)
+        weight_divisor_idx = coo_matrix((weights_vals, (weights_rows, weights_cols)),\
+            shape=(pred_matrix.shape))
+        weight_divisor = sparse.csc_matrix.dot(self.sim, weight_divisor_idx.tocsc())
+
+        #divide by the appropriate sum of weights (only the ones used)
+        pred_matrix = pred_matrix/weight_divisor
+
+        #if any nan's from 0 division fill with the average
+        pred_matrix[np.isnan(pred_matrix)] = np.mean(self.X.data)
+
+        #store predictions for the appropriate X_answers indexes in a vector
+        #and the actual values to return
+        preds = pred_matrix[X_answers.row, X_answers.col] >= threshold
+        actls = X_answers.data
+
+        return preds, actls
+
+class NN_cos_encode_wrong_Learner(Learner):
+    def __init__(self, df=None, X=None, sim=None, threshold=None, encode_wrong=None):
+        super().__init__(df)
+        self.sim = sim
+        self.X = X
+        self.threshold = threshold
+        self.encode_wrong = encode_wrong
+
+    def __str__(self):
+        return 'NN_cos_encode_wrong_Learner|thresh={}|encode_wrong={}'.\
+            format(self.threshold, self.encode_wrong)
+
+    def fit(self, X, encode_wrong):
+        '''
+        Calculate the cosine similarity matrix
+        Inputs:
+            X: mxn coo_sparse matrix, m = each sample, n = # of features
+        Ouputs:
+            sim: mxm similarity dense matrix
+        '''
+        #purely for naming
+        self.encode_wrong = encode_wrong
+
+        #what if an X of all 0's? it will default to 0 sim
+        self.X = X
+
+        #change ecoded 0's to be encode_wrong
+        data = self.X.data
+        data[data==0] = encode_wrong
+        self.X.data = data
+
+        #change all labelled 0's to -1
+        self.sim = cosine_similarity(X, X)
+
+    def pred(self, X_answers, threshold):
+        '''
+        using self.sim, predict on X_answers
+        Inputs:
+            X_answers: mxn coo_sparse matrix, m = each sample, n = # of features
+                ***filled parts of the sparse matrix are what we are predicting
+                for, labels are all binary 0/1 (False/True)
+        Outputs:
+            preds: ndarray of size filled_values in X_answers of the predictions
+            actls: ndarray of size filled_values in X_answers of actual labels
+        '''
+        #purely for labeling purposes
+        self.threshold = threshold
+
         #get the prediction matrix that will be (mxm)dot(mxn) giving (mxn)
         pred_matrix = sparse.csc_matrix.dot(self.sim, self.X.tocsc())
 
@@ -84,46 +222,61 @@ class NN_cos_Learner(Learner):
         return preds, actls
 
 class Uniform_Random_Learner(Learner):
+    def __init__(self, df=None, X=None, threshold=None):
+        super().__init__(df)
+        self.X = X
+        self.threshold = threshold
+
     def __str__(self):
-        return 'Uniform_Random_Learner'
+        return 'Uniform_Random_Learner|thresh={}'.format(self.threshold)
 
     def pred(self, X_answers, threshold):
+        #purely for naming purposes
+        self.threshold = threshold
+
         preds = np.random.uniform(0, 1, X_answers.data.shape) >= threshold
         actls = X_answers.data
 
         return preds, actls
 
 class Gloabl_Avg_Learner(Learner):
-    def __init__(self, df=None, X=None):
+    def __init__(self, df=None, X=None, threshold=None):
         super().__init__(df)
         self.X = X
+        self.threshold = threshold
 
     def __str__(self):
-        return 'Gloabl_Avg_Learner'
+        return 'Gloabl_Avg_Learner|thresh={}'.format(self.threshold)
 
     def fit(self, X):
         self.X = X
 
     def pred(self, X_answers, threshold):
+        #purely for naming purposes
+        self.threshold = threshold
+
         preds = np.ones(X_answers.data.shape)*np.mean(self.X.data) >= threshold
         actls = X_answers.data
 
         return preds, actls
 
 class Within_XCol_Avg_Learner(Learner):
-    def __init__(self, df=None, X=None):
+    def __init__(self, df=None, X=None, threshold=None):
         super().__init__(df)
         self.X = X
+        self.threshold = threshold
 
     def __str__(self):
-        return 'Within_XCol_Avg_Learner'
+        return 'Within_XCol_Avg_Learner|thresh={}'.format(self.threshold)
 
     def fit(self, X):
         self.X = X
 
     def pred(self, X_answers, threshold):
+        #purely for naming purposes
+        self.threshold = threshold
+
         '''predictions for X_answers are the average of the columns in self.X'''
-        import ipdb; ipdb.set_trace()
         #first find matrix size X.shape that holds 1 for where there is a value
         #in the sparse self.X
         X_val_idx = coo_matrix((np.ones(self.X.data.shape), (self.X.row, self.X.col)),\
@@ -149,9 +302,10 @@ class Within_XCol_Avg_Learner(Learner):
         return preds, actls
 
 class Within_XRow_Avg_Learner(Learner):
-    def __init__(self, df=None, X=None):
+    def __init__(self, df=None, X=None, threshold=None):
         super().__init__(df)
         self.X = X
+        self.threshold = threshold
 
     def __str__(self):
         return 'Within_XRow_Avg_Learner'
@@ -161,7 +315,9 @@ class Within_XRow_Avg_Learner(Learner):
 
     def pred(self, X_answers, threshold):
         '''predictions for X_answers are the average of the columns in self.X'''
-        import ipdb; ipdb.set_trace()
+        #purely for naming purposes
+        self.threshold = threshold
+
         #first find matrix size X.shape that holds 1 for where there is a value
         #in the sparse self.X
         X_val_idx = coo_matrix((np.ones(self.X.data.shape), (self.X.row, self.X.col)),\
