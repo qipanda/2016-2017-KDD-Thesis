@@ -6,6 +6,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse import csr_matrix
 from scipy import sparse
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import pairwise_distances
 
 import loading_util as lu
 
@@ -220,6 +221,156 @@ class NN_cos_encode_wrong_Learner(Learner):
         actls = X_answers.data
 
         return preds, actls
+
+class NN_l1_Learner(Learner):
+    def __init__(self, df=None, X=None, sim=None, threshold=None):
+        super().__init__(df)
+        self.sim = sim
+        self.X = X
+        self.threshold = threshold
+
+    def __str__(self):
+        return 'NN_cos_l1|thresh={}'.format(self.threshold)
+
+    def fit(self, X):
+        '''
+        Calculate the cosine similarity matrix
+        Inputs:
+            X: mxn coo_sparse matrix, m = each sample, n = # of features
+        Ouputs:
+            sim: mxm similarity dense matrix
+        '''
+        # import ipdb; ipdb.set_trace()
+        #what if an X of all 0's? it will default to 0 sim
+        self.X = X
+
+        #TODO How to handle missing values being treated as 0 in sparse?
+        #determine the max and min of all possible X's to get range to subtract
+        range_of_X = np.max(self.X.data) - np.min(self.X.data)
+
+        #determine the size of each vector to normalize the distances
+        norm = self.X.shape[1]
+
+        #to get similarity, take range_of_X .- dist_matrix
+        self.sim = range_of_X - (pairwise_distances(X.tocsr(), metric='l1', n_jobs=-1)/norm)
+
+    def pred(self, X_answers, threshold):
+        '''
+        using self.sim, predict on X_answers
+        Inputs:
+            X_answers: mxn coo_sparse matrix, m = each sample, n = # of features
+                ***filled parts of the sparse matrix are what we are predicting
+                for, labels are all binary 0/1 (False/True)
+        Outputs:
+            preds: ndarray of size filled_values in X_answers of the predictions
+            actls: ndarray of size filled_values in X_answers of actual labels
+        '''
+        #assign threshold purely for labelling
+        self.threshold = threshold
+
+        #get the prediction matrix that will be (mxm)dot(mxn) giving (mxn)
+        pred_matrix = sparse.csc_matrix.dot(self.sim, self.X.tocsc())
+
+        #make weight_divisor so that it only includes weights that had a value
+        weights_rows = self.X.row
+        weights_cols = self.X.col
+        weights_vals = np.ones(self.X.row.shape)
+        weight_divisor_idx = coo_matrix((weights_vals, (weights_rows, weights_cols)),\
+            shape=(pred_matrix.shape))
+        weight_divisor = sparse.csc_matrix.dot(self.sim, weight_divisor_idx.tocsc())
+
+        #divide by the appropriate sum of weights (only the ones used)
+        pred_matrix = pred_matrix/weight_divisor
+
+        #if any nan's from 0 division fill with the average
+        pred_matrix[np.isnan(pred_matrix)] = np.mean(self.X.data)
+
+        #store predictions for the appropriate X_answers indexes in a vector
+        #and the actual values to return
+        preds = pred_matrix[X_answers.row, X_answers.col] >= threshold
+        actls = X_answers.data
+
+        return preds, actls
+
+class NN_l1_encode_wrong_Learner(Learner):
+    def __init__(self, df=None, X=None, sim=None, threshold=None, encode_wrong=None):
+        super().__init__(df)
+        self.sim = sim
+        self.X = X
+        self.threshold = threshold
+        self.encode_wrong = encode_wrong
+
+    def __str__(self):
+        return 'NN_l1_encode_wrong_Learner|thresh={}|encode_wrong={}'.\
+            format(self.threshold, self.encode_wrong)
+
+    def fit(self, X, encode_wrong):
+        '''
+        Calculate the cosine similarity matrix
+        Inputs:
+            X: mxn coo_sparse matrix, m = each sample, n = # of features
+        Ouputs:
+            sim: mxm similarity dense matrix
+        '''
+        #purely for naming
+        self.encode_wrong = encode_wrong
+
+        #what if an X of all 0's? it will default to 0 sim
+        self.X = X
+
+        #change ecoded 0's to be encode_wrong
+        data = self.X.data
+        data[data==0] = encode_wrong
+        self.X.data = data
+
+        #TODO How to handle missing values being treated as 0 in sparse?
+        #determine the max and min of all possible X's to get range to subtract
+        range_of_X = np.max(self.X.data) - np.min(self.X.data)
+
+        #determine the size of each vector to normalize the distances
+        norm = self.X.shape[1]
+
+        #to get similarity, take range_of_X .- dist_matrix
+        self.sim = range_of_X - (pairwise_distances(X.tocsr(), metric='l1', n_jobs=-1)/norm)
+
+    def pred(self, X_answers, threshold):
+        '''
+        using self.sim, predict on X_answers
+        Inputs:
+            X_answers: mxn coo_sparse matrix, m = each sample, n = # of features
+                ***filled parts of the sparse matrix are what we are predicting
+                for, labels are all binary 0/1 (False/True)
+        Outputs:
+            preds: ndarray of size filled_values in X_answers of the predictions
+            actls: ndarray of size filled_values in X_answers of actual labels
+        '''
+        #purely for labeling purposes
+        self.threshold = threshold
+
+        #get the prediction matrix that will be (mxm)dot(mxn) giving (mxn)
+        pred_matrix = sparse.csc_matrix.dot(self.sim, self.X.tocsc())
+
+        #make weight_divisor so that it only includes weights that had a value
+        weights_rows = self.X.row
+        weights_cols = self.X.col
+        weights_vals = np.ones(self.X.row.shape)
+        weight_divisor_idx = coo_matrix((weights_vals, (weights_rows, weights_cols)),\
+            shape=(pred_matrix.shape))
+        weight_divisor = sparse.csc_matrix.dot(self.sim, weight_divisor_idx.tocsc())
+
+        #divide by the appropriate sum of weights (only the ones used)
+        pred_matrix = pred_matrix/weight_divisor
+
+        #if any nan's from 0 division fill with the average
+        pred_matrix[np.isnan(pred_matrix)] = np.mean(self.X.data)
+
+        #store predictions for the appropriate X_answers indexes in a vector
+        #and the actual values to return
+        preds = pred_matrix[X_answers.row, X_answers.col] >= threshold
+        actls = X_answers.data
+
+        return preds, actls
+
 
 class Uniform_Random_Learner(Learner):
     def __init__(self, df=None, X=None, threshold=None):

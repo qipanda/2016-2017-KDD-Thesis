@@ -114,9 +114,90 @@ test_results = []
 # }
 # nn_uniform_results = dm.test_2D_sparse(**test_2D_sparse_params)
 
-#Global_Average_Learner
+# #Global_Average_Learner
+# test_2D_sparse_params = {
+#     'Learner':Learners.Gloabl_Avg_Learner,
+#     'tm_orders_totest':tm_orders_totest,
+#     'ftr_name':'X_correct_latest',
+#     'answers_name':'X_correct',
+#     'fit_params':{},
+#     'pred_params':{
+#         'threshold':0.5
+#     }
+# }
+# test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+#
+# #Within_XCol_Avg_Learner (within each Problem-Step)
+# test_2D_sparse_params = {
+#     'Learner':Learners.Within_XCol_Avg_Learner,
+#     'tm_orders_totest':tm_orders_totest,
+#     'ftr_name':'X_correct_latest',
+#     'answers_name':'X_correct',
+#     'fit_params':{},
+#     'pred_params':{
+#         'threshold':0.5
+#     }
+# }
+# test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+#
+# #Within_XRow_Avg_Learner (within each Student)
+# test_2D_sparse_params = {
+#     'Learner':Learners.Within_XRow_Avg_Learner,
+#     'tm_orders_totest':tm_orders_totest,
+#     'ftr_name':'X_correct_latest',
+#     'answers_name':'X_correct',
+#     'fit_params':{},
+#     'pred_params':{
+#         'threshold':0.5
+#     }
+# }
+# test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+#
+# '''3.) Test NN methods'''
+# #NN_cosine with 0/1 encoding in X
+# test_2D_sparse_params = {
+#     'Learner':Learners.NN_cos_Learner,
+#     'tm_orders_totest':tm_orders_totest,
+#     'ftr_name':'X_correct_latest',
+#     'answers_name':'X_correct',
+#     'fit_params':{},
+#     'pred_params':{
+#         'threshold':0.5
+#     }
+# }
+# test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+#
+# #NN cosine with 0/1 encoding in X but simdiags = 0
+# test_2D_sparse_params = {
+#     'Learner':Learners.NN_cos_noselfsim_Learner,
+#     'tm_orders_totest':tm_orders_totest,
+#     'ftr_name':'X_correct_latest',
+#     'answers_name':'X_correct',
+#     'fit_params':{},
+#     'pred_params':{
+#         'threshold':0.5
+#     }
+# }
+# test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+#
+# #NN_cosine with -1/0/1 encoding in X (-1 for incorrects instead of 0)
+# test_2D_sparse_params = {
+#     'Learner':Learners.NN_cos_encode_wrong_Learner,
+#     'tm_orders_totest':tm_orders_totest,
+#     'ftr_name':'X_correct_latest',
+#     'answers_name':'X_correct',
+#     'fit_params':{
+#         'encode_wrong':-1.0
+#     },
+#     'pred_params':{
+#         'threshold':0.0
+#     }
+# }
+# test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+
+#NN_l1 with 0/1 encoding in X
 test_2D_sparse_params = {
-    'Learner':Learners.Gloabl_Avg_Learner,
+    'Learner':Learners.NN_l1_Learner,
     'tm_orders_totest':tm_orders_totest,
     'ftr_name':'X_correct_latest',
     'answers_name':'X_correct',
@@ -127,62 +208,9 @@ test_2D_sparse_params = {
 }
 test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
 
-#Within_XCol_Avg_Learner (within each Problem-Step)
+#NN_l1 with -1/0/1 encoding in X
 test_2D_sparse_params = {
-    'Learner':Learners.Within_XCol_Avg_Learner,
-    'tm_orders_totest':tm_orders_totest,
-    'ftr_name':'X_correct_latest',
-    'answers_name':'X_correct',
-    'fit_params':{},
-    'pred_params':{
-        'threshold':0.5
-    }
-}
-test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
-
-#Within_XRow_Avg_Learner (within each Student)
-test_2D_sparse_params = {
-    'Learner':Learners.Within_XRow_Avg_Learner,
-    'tm_orders_totest':tm_orders_totest,
-    'ftr_name':'X_correct_latest',
-    'answers_name':'X_correct',
-    'fit_params':{},
-    'pred_params':{
-        'threshold':0.5
-    }
-}
-test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
-
-'''3.) Test NN methods'''
-#NN_cosine with 0/1 encoding in X
-test_2D_sparse_params = {
-    'Learner':Learners.NN_cos_Learner,
-    'tm_orders_totest':tm_orders_totest,
-    'ftr_name':'X_correct_latest',
-    'answers_name':'X_correct',
-    'fit_params':{},
-    'pred_params':{
-        'threshold':0.5
-    }
-}
-test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
-
-#NN cosine with 0/1 encoding in X but simdiags = 0
-test_2D_sparse_params = {
-    'Learner':Learners.NN_cos_noselfsim_Learner,
-    'tm_orders_totest':tm_orders_totest,
-    'ftr_name':'X_correct_latest',
-    'answers_name':'X_correct',
-    'fit_params':{},
-    'pred_params':{
-        'threshold':0.5
-    }
-}
-test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
-
-#NN_cosine with -1/0/1 encoding in X (-1 for incorrects instead of 0)
-test_2D_sparse_params = {
-    'Learner':Learners.NN_cos_encode_wrong_Learner,
+    'Learner':Learners.NN_l1_encode_wrong_Learner,
     'tm_orders_totest':tm_orders_totest,
     'ftr_name':'X_correct_latest',
     'answers_name':'X_correct',
@@ -194,7 +222,7 @@ test_2D_sparse_params = {
     }
 }
 test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
-# import ipdb; ipdb.set_trace()
+import ipdb; ipdb.set_trace()
 
 '''#TODO calculate/graph results'''
 plot_test_2D_sparse_results_params = {
@@ -205,5 +233,5 @@ plot_test_2D_sparse_results_params = {
         'True Positive Rate', 'True Negative Rate'],
     'starting_figure':0
 }
-gu.plot_test_2D_sparse_results(**plot_test_2D_sparse_results_params)
-lu.save_pickle('test_results_3methods_50tm', test_results, 'results')
+# gu.plot_test_2D_sparse_results(**plot_test_2D_sparse_results_params)
+lu.save_pickle('test_results_twol1methods_50tm', test_results, 'results')
