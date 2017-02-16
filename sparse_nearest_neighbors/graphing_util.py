@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 import math
 
-def plot_test_2D_sparse_results(results, x_range_col, label_col, value_cols):
+def plot_test_2D_sparse_results(results, x_range_col, label_col, value_cols, starting_figure):
     '''
     Inputs:
         [results] = list of dataframes that contain the results
@@ -17,12 +17,12 @@ def plot_test_2D_sparse_results(results, x_range_col, label_col, value_cols):
     x_range = results[0][x_range_col]
 
     for i, value in enumerate(value_cols):
-        plt.figure(i)
+        plt.figure(i+starting_figure)
         for result in results:
             y_range = result[value]
             plt.plot(x_range, y_range, label=result[label_col][0])
 
-        plt.legend(loc='best')
+        plt.legend(loc='best', prop={'size':9})
         plt.xlabel(x_range_col)
         plt.ylabel(value)
         plt.xticks(x_range)

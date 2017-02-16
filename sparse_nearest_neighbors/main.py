@@ -202,7 +202,8 @@ plot_test_2D_sparse_results_params = {
     'x_range_col':'t_cur',
     'label_col':'Learner Name',
     'value_cols':['Accuracy', 'Positive Predictive Value', 'Negative Predictive Value',\
-        'True Positive Rate', 'True Negative Rate']
+        'True Positive Rate', 'True Negative Rate'],
+    'starting_figure':0
 }
 gu.plot_test_2D_sparse_results(**plot_test_2D_sparse_results_params)
 lu.save_pickle('test_results_3methods_50tm', test_results, 'results')
