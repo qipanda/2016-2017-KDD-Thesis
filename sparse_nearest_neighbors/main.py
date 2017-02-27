@@ -11,9 +11,10 @@ import matplotlib.pyplot as plt
 this script is meant to show the results of testing on single KC data
 '''
 
-# '''Prelim A: Load single KC data'''
+'''Prelim A: Load single KC data'''
 # single_KC_data = pd.read_pickle('/Users/qipanda/Documents/2016-2017_KDD_Thesis/education_data'+\
 #     '/bridge_to_algebra_2008_2009/bridge_0809_KC.pkl')
+#
 #
 # test_df = pd.DataFrame(
 #     {
@@ -39,7 +40,7 @@ this script is meant to show the results of testing on single KC data
 #     'tm_order_col':     'First Transaction Time Order'
 # }
 # dm.assign_rel_tm(**assign_rel_tm_params)
-
+#
 # '''1.) Preprocess features in DM'''
 # assign_2D_sparse_ftrs_params = {
 #     'ftr_name':     'X_correct',
@@ -55,7 +56,17 @@ this script is meant to show the results of testing on single KC data
 # assign_2D_sparse_ftrs_params['value_col'] = 'Problem View'
 # dm.assign_2D_sparse_ftrs(**assign_2D_sparse_ftrs_params)
 #
-# #now create the latest correct/view for every tm_order
+# #now create the same but for total_corrects
+# assign_2D_sparse_ftrs_params['ftr_name'] = 'X_correct_cnt'
+# assign_2D_sparse_ftrs_params['value_col'] = 'Corrects'
+# dm.assign_2D_sparse_ftrs(**assign_2D_sparse_ftrs_params)
+#
+# #now create the same but for total_incorrects
+# assign_2D_sparse_ftrs_params['ftr_name'] = 'X_incorrect_cnt'
+# assign_2D_sparse_ftrs_params['value_col'] = 'Incorrects'
+# dm.assign_2D_sparse_ftrs(**assign_2D_sparse_ftrs_params)
+#
+#now create the latest correct/view for every tm_order
 # assign_2D_sparse_ftrs_max_params = {
 #     'ftr_name':     'X_correct',
 #     'max_ftr_name': 'X_correct_latest'
@@ -66,11 +77,21 @@ this script is meant to show the results of testing on single KC data
 #     'max_ftr_name': 'X_views_latest'
 # }
 # dm.assign_2D_sparse_ftrs_max(**assign_2D_sparse_ftrs_max_params)
+# assign_2D_sparse_ftrs_max_params = {
+#     'ftr_name':     'X_correct_cnt',
+#     'max_ftr_name': 'X_correct_cnt_latest'
+# }
+# dm.assign_2D_sparse_ftrs_max(**assign_2D_sparse_ftrs_max_params)
+# assign_2D_sparse_ftrs_max_params = {
+#     'ftr_name':     'X_incorrect_cnt',
+#     'max_ftr_name': 'X_incorrect_cnt_latest'
+# }
+# dm.assign_2D_sparse_ftrs_max(**assign_2D_sparse_ftrs_max_params)
 #
 #save the preprocessed dm
 # lu.save_pickle('test_preprocessed_DM', dm, 'saved_ftrs')
 
-'''1.) Preprocessing for based X_ftrs, X_views done, load them'''
+'''2.) Preprocessing for based X_ftrs, X_views done, load them'''
 dm = lu.load_pickle('test_preprocessed_DM', 'saved_ftrs')
 tm_orders_totest = 50
 
@@ -80,32 +101,57 @@ load_params = {
     'foldername':'saved_ftrs'
 }
 dm.load_2D_sparse_ftrs(**load_params)
+# load_params = {
+#     'ftr_name':'X_views',
+#     'filenames':'X_views',
+#     'foldername':'saved_ftrs'
+# }
+# dm.load_2D_sparse_ftrs(**load_params)
 load_params = {
-    'ftr_name':'X_views',
-    'filenames':'X_views',
+    'ftr_name':'X_correct_cnt',
+    'filenames':'X_correct_cnt',
     'foldername':'saved_ftrs'
 }
 dm.load_2D_sparse_ftrs(**load_params)
+load_params = {
+    'ftr_name':'X_incorrect_cnt',
+    'filenames':'X_incorrect_cnt',
+    'foldername':'saved_ftrs'
+}
+dm.load_2D_sparse_ftrs(**load_params)
+
 load_params = {
     'ftr_name':'X_correct_latest',
     'filenames':['X_correct_latest_1', 'X_correct_latest_2', 'X_correct_latest_3', 'X_correct_latest_4'],
     'foldername':'saved_ftrs'
 }
 dm.load_2D_sparse_ftrs(**load_params)
+# load_params = {
+#     'ftr_name':'X_views_latest',
+#     'filenames':['X_views_latest_1', 'X_views_latest_2', 'X_views_latest_3', 'X_views_latest_4'],
+#     'foldername':'saved_ftrs'
+# }
+# dm.load_2D_sparse_ftrs(**load_params)
 load_params = {
-    'ftr_name':'X_views_latest',
-    'filenames':['X_views_latest_1', 'X_views_latest_2', 'X_views_latest_3', 'X_views_latest_4'],
+    'ftr_name':'X_correct_cnt_latest',
+    'filenames':['X_correct_cnt_latest_1', 'X_correct_cnt_latest_2', 'X_correct_cnt_latest_3', 'X_correct_cnt_latest_4'],
+    'foldername':'saved_ftrs'
+}
+dm.load_2D_sparse_ftrs(**load_params)
+load_params = {
+    'ftr_name':'X_incorrect_cnt_latest',
+    'filenames':['X_incorrect_cnt_latest_1', 'X_incorrect_cnt_latest_2', 'X_incorrect_cnt_latest_3', 'X_incorrect_cnt_latest_4'],
     'foldername':'saved_ftrs'
 }
 dm.load_2D_sparse_ftrs(**load_params)
 
+'''3.) Test Baselines'''
 test_results = []
-'''2.) Test Baselines'''
-#Uniform_Random_Learner
+# #Uniform_Random_Learner
 # test_2D_sparse_params = {
 #     'Learner':Learners.Uniform_Random_Learner,
 #     'tm_orders_totest':tm_orders_totest,
-#     'ftr_name':'X_correct_latest',
+#     'ftr_names':['X_correct_latest'],
 #     'answers_name':'X_correct',
 #     'fit_params':{},
 #     'pred_params':{
@@ -118,7 +164,7 @@ test_results = []
 # test_2D_sparse_params = {
 #     'Learner':Learners.Gloabl_Avg_Learner,
 #     'tm_orders_totest':tm_orders_totest,
-#     'ftr_name':'X_correct_latest',
+#     'ftr_names':['X_correct_latest'],
 #     'answers_name':'X_correct',
 #     'fit_params':{},
 #     'pred_params':{
@@ -131,7 +177,7 @@ test_results = []
 # test_2D_sparse_params = {
 #     'Learner':Learners.Within_XCol_Avg_Learner,
 #     'tm_orders_totest':tm_orders_totest,
-#     'ftr_name':'X_correct_latest',
+#     'ftr_names':['X_correct_latest'],
 #     'answers_name':'X_correct',
 #     'fit_params':{},
 #     'pred_params':{
@@ -144,7 +190,7 @@ test_results = []
 # test_2D_sparse_params = {
 #     'Learner':Learners.Within_XRow_Avg_Learner,
 #     'tm_orders_totest':tm_orders_totest,
-#     'ftr_name':'X_correct_latest',
+#     'ftr_names':['X_correct_latest'],
 #     'answers_name':'X_correct',
 #     'fit_params':{},
 #     'pred_params':{
@@ -158,7 +204,7 @@ test_results = []
 # test_2D_sparse_params = {
 #     'Learner':Learners.NN_cos_Learner,
 #     'tm_orders_totest':tm_orders_totest,
-#     'ftr_name':'X_correct_latest',
+#     'ftr_names':['X_correct_latest'],
 #     'answers_name':'X_correct',
 #     'fit_params':{},
 #     'pred_params':{
@@ -171,7 +217,7 @@ test_results = []
 # test_2D_sparse_params = {
 #     'Learner':Learners.NN_cos_noselfsim_Learner,
 #     'tm_orders_totest':tm_orders_totest,
-#     'ftr_name':'X_correct_latest',
+#     'ftr_names':['X_correct_latest'],
 #     'answers_name':'X_correct',
 #     'fit_params':{},
 #     'pred_params':{
@@ -184,7 +230,7 @@ test_results = []
 # test_2D_sparse_params = {
 #     'Learner':Learners.NN_cos_encode_wrong_Learner,
 #     'tm_orders_totest':tm_orders_totest,
-#     'ftr_name':'X_correct_latest',
+#     'ftr_names':['X_correct_latest'],
 #     'answers_name':'X_correct',
 #     'fit_params':{
 #         'encode_wrong':-1.0
@@ -194,37 +240,55 @@ test_results = []
 #     }
 # }
 # test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
-
-#NN_l1 with 0/1 encoding in X
+#
+# #NN_l1 with 0/1 encoding in X
+# test_2D_sparse_params = {
+#     'Learner':Learners.NN_l1_Learner,
+#     'tm_orders_totest':tm_orders_totest,
+#     'ftr_names':['X_correct_latest'],
+#     'answers_name':'X_correct',
+#     'fit_params':{},
+#     'pred_params':{
+#         'threshold':0.5
+#     }
+# }
+# test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+#
+# #NN_l1 with -1/0/1 encoding in X
+# test_2D_sparse_params = {
+#     'Learner':Learners.NN_l1_encode_wrong_Learner,
+#     'tm_orders_totest':tm_orders_totest,
+#     'ftr_names':['X_correct_latest'],
+#     'answers_name':'X_correct',
+#     'fit_params':{
+#         'encode_wrong':-1.0
+#     },
+#     'pred_params':{
+#         'threshold':0.0
+#     }
+# }
+# test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+import ipdb; ipdb.set_trace()
+#NN with custom encoding using correct_cnt and incorrect_cnt
 test_2D_sparse_params = {
-    'Learner':Learners.NN_l1_Learner,
+    'Learner':Learners.NN_custom_withweights_Learner,
     'tm_orders_totest':tm_orders_totest,
-    'ftr_name':'X_correct_latest',
-    'answers_name':'X_correct',
-    'fit_params':{},
-    'pred_params':{
-        'threshold':0.5
-    }
-}
-test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
-
-#NN_l1 with -1/0/1 encoding in X
-test_2D_sparse_params = {
-    'Learner':Learners.NN_l1_encode_wrong_Learner,
-    'tm_orders_totest':tm_orders_totest,
-    'ftr_name':'X_correct_latest',
+    'ftr_names':['X_correct_latest', 'X_correct_cnt_latest', 'X_incorrect_cnt_latest'],
     'answers_name':'X_correct',
     'fit_params':{
-        'encode_wrong':-1.0
+        'w_correct':1.0,
+        'w_incorrect':1.0,
+        'agg':np.sum
     },
     'pred_params':{
-        'threshold':0.0
-    }
+        'threshold':0.5
+    },
+    'ftr_name':'X_cor_and_incor_cnt'
 }
 test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
-import ipdb; ipdb.set_trace()
+lu.save_pickle('test_results_customsim_50tm', test_results, 'results')
 
-'''#TODO calculate/graph results'''
+'''4.) calculate/graph results'''
 plot_test_2D_sparse_results_params = {
     'results':test_results,
     'x_range_col':'t_cur',
@@ -233,5 +297,5 @@ plot_test_2D_sparse_results_params = {
         'True Positive Rate', 'True Negative Rate'],
     'starting_figure':0
 }
-# gu.plot_test_2D_sparse_results(**plot_test_2D_sparse_results_params)
-lu.save_pickle('test_results_twol1methods_50tm', test_results, 'results')
+gu.plot_test_2D_sparse_results(**plot_test_2D_sparse_results_params)
+# lu.save_pickle('test_results_customsim_50tm', test_results, 'results')

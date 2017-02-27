@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import timeit
+import time
 
 from scipy.spatial import distance
 from scipy.sparse import coo_matrix
@@ -371,6 +373,164 @@ class NN_l1_encode_wrong_Learner(Learner):
 
         return preds, actls
 
+class NN_custom_withweights_Learner(Learner):
+    def __init__(self, df=None, X=None, sim=None, threshold=None):
+        super().__init__(df)
+        self.sim = sim
+        self.X = X
+        self.threshold = threshold
+
+    def __str__(self):
+        return 'NN_custom_noselfsim_Learner|thresh={}'.format(self.threshold)
+
+    def create_sparse_stack(self, X_coo):
+        '''
+        Create the LHS and RHS of pairwise vector combinations between students,
+        only capturing the upper triangular combaintions
+        Inputs:
+            X_coo: sparse 2D coo matrix where rows = stud, col = problem-step
+        Outputs:
+            lhs_stacked: LHS sparse 2D coo stack
+            rhs_stacked: RHS sparse 2D coo stack
+        '''
+        #get number of students and problem steps for later
+        m = X_coo.shape[0]
+        n = X_coo.shape[1]
+
+        #list for storing the upper triangular values created in each iter
+        upper_tri_vals = []
+
+        #convert X_coo to be csr for row slicing, counter for lhs
+        X_csr = X_coo.tocsr()
+
+        #loop [0,m-1) because don't need the final corner (since it is 0 in sim)
+        for i in range(m-1):
+            #get the appropriate slices
+            lhs_slice = X_csr[i, :]
+            lhs_data = np.tile(lhs_slice.data, (m-1)-i)
+            lhs_cols = np.tile(lhs_slice.indices, (m-1)-i)
+            lhs_rows = np.repeat(
+                np.arange(
+                    start=0,
+                    stop=(m-1)-i
+                ),
+                repeats=lhs_slice.data.shape[0]
+            )
+            lhs_slice = coo_matrix((lhs_data, (lhs_rows, lhs_cols)), shape=((m-1)-i, n))
+
+            rhs_slice = X_csr[(i+1):, :].tocoo()
+
+            #take difference between slices, abs, then sum axis=1
+            diff = lhs_slice - rhs_slice #TODO TRY WITH CSR?, TRY DIFFERENT ENCODING?
+            diff.data = np.absolute(diff.data)
+            diff = diff.sum(axis=1)
+
+            upper_tri_vals.append(diff)
+
+        #convert to a long 1D numpy array
+        upper_tri_vals = np.concatenate(upper_tri_vals)
+
+        return upper_tri_vals
+
+    def fit(self, X_correct_latest, X_correct_cnt_latest, X_incorrect_cnt_latest, \
+        w_correct, w_incorrect, agg):
+        '''
+        Calculate similarity matrix based on the correct_cnt_latest and
+        incorrect_cnt_latest
+        Inputs:
+            X_correct_latest: 2D sparse coo holding the current 0/1 correct/not
+                at t_cur, here it is set to self.X purely for pred() to calc
+                predictions given the similarity that will be generated here
+            X_correct_cnt_latest: 2D sparse coo holding the total corrects for a
+                student currently
+            X_incorrect_cnt_latest: same as above but for incorrects
+            w_correct:
+            w_incorrect:
+        Ouputs:
+            self.sim: mxm similarity dense matrix using custom similarity
+        '''
+        #TODO: utilize agg?
+        '''UNCOMMENT ENCLOSED FOR TESTING'''
+        # import ipdb; ipdb.set_trace()
+        # X_correct_latest = np.zeros(1)
+        #
+        # data_cor = np.array([1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1])
+        # rows_cor = np.array([0, 0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4])
+        # cols_cor = np.array([0, 3, 1, 2, 0, 1, 0, 1, 2, 1, 2, 3])
+        # X_correct_cnt_latest = coo_matrix(
+        #     (data_cor, (rows_cor, cols_cor)), shape=(5,4)
+        # )
+        #
+        # data_incor = np.array([5, 1, 2, 2, 3, 1, 4, 5, 1, 1, 1, 1, 1, 1, 2])
+        # rows_incor = np.array([0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4])
+        # cols_incor = np.array([0, 2, 3, 0, 1, 2, 3, 0, 2, 3, 0, 3, 1, 2, 3])
+        # X_incorrect_cnt_latest = coo_matrix(
+        #     (data_incor, (rows_incor, cols_incor)), shape=(5,4)
+        # )
+        '''END TESTING'''
+
+        #for pred
+        self.X = X_correct_latest
+
+        #get size of student x problem-step sparse matrix
+        m = X_correct_cnt_latest.shape[0]
+        n = X_correct_cnt_latest.shape[1]
+
+        #initialize the dist matrix to be dense zeros size stud x stud
+        dist = np.zeros((m, m))
+
+        #create the LHS and RHS stacks for correct and incorrects as coo sparses
+        cor_dist = self.create_sparse_stack(X_correct_cnt_latest)
+        incor_dist = self.create_sparse_stack(X_incorrect_cnt_latest)
+
+        #multiply by weights, add them together for distance, turn into upper
+        #triangular starting from the first spot NOT in diagonal
+        dist_vals = np.asarray((w_correct*cor_dist) + (w_incorrect*incor_dist)).reshape(-1)
+        dist[np.triu_indices(n=m, k=1)] = dist_vals
+        dist[np.tril_indices(n=m, k=-1)] = dist_vals
+
+        #create a simlarity matrix based on the dist matrix bounded to [0,1]
+        #max(dist) is the same as range(dist) in this case as all dist values>0
+        self.sim = 1.0 - (dist/np.max(dist))
+        np.fill_diagonal(self.sim, 0)
+
+    def pred(self, X_answers, threshold):
+        '''
+        using self.sim, predict on X_answers
+        Inputs:
+            X_answers: mxn coo_sparse matrix, m = each sample, n = # of features
+                ***filled parts of the sparse matrix are what we are predicting
+                for, labels are all binary 0/1 (False/True)
+        Outputs:
+            preds: ndarray of size filled_values in X_answers of the predictions
+            actls: ndarray of size filled_values in X_answers of actual labels
+        '''
+        #assign threshold purely for labelling
+        self.threshold = threshold
+
+        #get the prediction matrix that will be (mxm)dot(mxn) giving (mxn)
+        pred_matrix = sparse.csc_matrix.dot(self.sim, self.X.tocsc())
+
+        #make weight_divisor so that it only includes weights that had a value
+        weights_rows = self.X.row
+        weights_cols = self.X.col
+        weights_vals = np.ones(self.X.row.shape)
+        weight_divisor_idx = coo_matrix((weights_vals, (weights_rows, weights_cols)),\
+            shape=(pred_matrix.shape))
+        weight_divisor = sparse.csc_matrix.dot(self.sim, weight_divisor_idx.tocsc())
+
+        #divide by the appropriate sum of weights (only the ones used)
+        pred_matrix = pred_matrix/weight_divisor
+
+        #if any nan's from 0 division fill with the average
+        pred_matrix[np.isnan(pred_matrix)] = np.mean(self.X.data)
+
+        #store predictions for the appropriate X_answers indexes in a vector
+        #and the actual values to return
+        preds = pred_matrix[X_answers.row, X_answers.col] >= threshold
+        actls = X_answers.data
+
+        return preds, actls
 
 class Uniform_Random_Learner(Learner):
     def __init__(self, df=None, X=None, threshold=None):

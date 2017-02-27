@@ -145,8 +145,8 @@ class DataManipulator(object):
         else:
             self.sparse_ftrs[ftr_name] = lu.load_pickle(filenames, foldername)
 
-    def test_2D_sparse(self, Learner, tm_orders_totest, ftr_name, answers_name,
-        fit_params, pred_params):
+    def test_2D_sparse(self, Learner, tm_orders_totest, ftr_names, answers_name,
+        fit_params, pred_params, ftr_name=None):
         '''
         Given a learner, test them iterativly on self.sparse_ftrs.
         Inputs:
@@ -154,13 +154,16 @@ class DataManipulator(object):
                 fit(X=self.sparse_ftrs[ftr_name][t_cur])
                 predict(X_answers=self.sprase_ftrs[answers_name][t_cur+1])
             tm_orders_totest: the number of tm_order's to iterate through
-            ftr_name: name of the self.sparse_ftrs to use for fit
+            [ftr_names]: list of names of the self.sparse_ftrs to use for fit
             answers_name: name of the self.sparse_ftrs that represents the
                 answers to predict
             {fit_params}: additional parameters the learner may need for fit
             {pred_params}: additional parameters the learner may need for pred
         '''
-        # import ipdb; ipdb.set_trace()
+        #for naming
+        if ftr_name is None:
+            ftr_name = ftr_names[0]
+
         #instantiate the learner
         learner = Learner()
 
@@ -180,8 +183,13 @@ class DataManipulator(object):
         tpr_results = []
         tnr_results = []
 
+        t0 = time.time()
         for t_cur in range(tm_orders_totest):
-            learner.fit(self.sparse_ftrs[ftr_name][t_cur], **fit_params)
+            ftrs = {}
+            for ftr in ftr_names:
+                ftrs[ftr] = self.sparse_ftrs[ftr][t_cur]
+
+            learner.fit(**ftrs, **fit_params)
             preds, actls = learner.pred(self.sparse_ftrs[answers_name][t_cur+1], **pred_params)
 
             #calculate TP, TN, FP, FN
@@ -195,7 +203,8 @@ class DataManipulator(object):
             npv = tn/(tn+fn) #negative predictive value
             tpr = tp/(tp+fn) #true pos rate (out of all pos, how many got) (Recall)
             tnr = tn/(tn+fp) #true neg rate (out of all neg, how many got) (Specificity)
-            print('t_cur = {}| acc = {}'.format(t_cur, acc))
+            print('run_tm = {}| t_cur = {}| acc = {}'.format(time.time()-t0, t_cur, acc))
+            t0 = time.time()
 
             #insert results
             t_cur_results.append(t_cur)
