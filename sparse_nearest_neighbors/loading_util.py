@@ -2,9 +2,46 @@ import pandas as pd
 import numpy as np
 import math
 import pickle
+import os.path
+
+def save_pickle_workaround(filename, value, foldername=None):
+    n_bytes = 2**31
+    max_bytes = 2**31 - 1
+    bytes_out = pickle.dumps(value)
+
+    if foldername is None:
+        print('Saving pickle to {}.pickle'.format(filename))
+        with open('{}.pickle'.format(filename), 'wb') as handle:
+            for idx in range(0, n_bytes, max_bytes):
+                handle.write(bytes_out[idx:idx+max_bytes])
+    else:
+        print('Saving pickle to {}/{}.pickle'.format(foldername, filename))
+        with open('{}/{}.pickle'.format(foldername, filename), 'wb') as handle:
+            for idx in range(0, n_bytes, max_bytes):
+                handle.write(bytes_out[idx:idx+max_bytes])
+
+def load_pickle_workaround(filename, foldername=None):
+    n_bytes = 2**31
+    max_bytes = 2**31 - 1
+    bytes_in = bytearray(0)
+
+    if foldername is None:
+        print('Loading pickle from {}.pickle'.format(filename))
+        input_size = os.path.getsize('{}.pickle'.format(filename))
+
+        with open('{}.pickle'.format(filename), 'rb') as handle:
+            for _ in range(0, input_size, max_bytes):
+                bytes_in += handle.read(max_bytes)
+    else:
+        print('Loading pickle from {}/{}.pickle'.format(foldername, filename))
+        input_size = os.path.getsize('{}/{}.pickle'.format(foldername, filename))
+
+        with open('{}/{}.pickle'.format(foldername, filename), 'rb') as handle:
+            for _ in range(0, input_size, max_bytes):
+                bytes_in += handle.read(max_bytes)
+    return pickle.loads(bytes_in)
 
 def save_pickle(filename, value, foldername=None):
-
     if foldername is None:
         print('Saving pickle to {}.pickle'.format(filename))
         with open('{}.pickle'.format(filename), 'wb') as handle:

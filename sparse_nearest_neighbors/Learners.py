@@ -381,14 +381,18 @@ class NN_custom_withweights_Learner(Learner):
         self.threshold = threshold
 
     def __str__(self):
-        return 'NN_custom_noselfsim_Learner|thresh={}'.format(self.threshold)
+        return 'cust_dist|w_incor={}|w_cor={}|agg={}|thresh={}'\
+            .format(self.w_incor, self.w_cor, self.agg, self.threshold)
 
-    def create_sparse_stack(self, X_coo):
+    def create_sparse_stack(self, X_coo, agg, t_cur, save_name=None, load_name=None):
         '''
         Create the LHS and RHS of pairwise vector combinations between students,
         only capturing the upper triangular combaintions
         Inputs:
             X_coo: sparse 2D coo matrix where rows = stud, col = problem-step
+            agg: string that determines how we aggregate the indep problem-step
+                distances of correct and incorrect
+            save_name: string of name when saving
         Outputs:
             lhs_stacked: LHS sparse 2D coo stack
             rhs_stacked: RHS sparse 2D coo stack
@@ -397,47 +401,87 @@ class NN_custom_withweights_Learner(Learner):
         m = X_coo.shape[0]
         n = X_coo.shape[1]
 
+        if save_name is not None:
+            saved_stacks = []
+
         #list for storing the upper triangular values created in each iter
         upper_tri_vals = []
 
         #convert X_coo to be csr for row slicing, counter for lhs
         X_csr = X_coo.tocsr()
 
-        #loop [0,m-1) because don't need the final corner (since it is 0 in sim)
-        for i in range(m-1):
-            #get the appropriate slices
-            lhs_slice = X_csr[i, :]
-            lhs_data = np.tile(lhs_slice.data, (m-1)-i)
-            lhs_cols = np.tile(lhs_slice.indices, (m-1)-i)
-            lhs_rows = np.repeat(
-                np.arange(
-                    start=0,
-                    stop=(m-1)-i
-                ),
-                repeats=lhs_slice.data.shape[0]
-            )
-            lhs_slice = coo_matrix((lhs_data, (lhs_rows, lhs_cols)), shape=((m-1)-i, n))
+        if load_name is not None:
+            loaded_stacks = lu.load_pickle_workaround('{}_diff_tm{}'.format(load_name, t_cur), 'saved_diff_stacks')
+            for diff in loaded_stacks:
+                #agg based on string TODO VERIFY NO BUGS
+                if agg == 'sum':
+                    diff = diff.sum(axis=1)
+                elif agg == 'avg':
+                    diff = diff.mean(axis=1)
+                elif agg == 'sqrt(sum_of_squares)':
+                    diff.data = diff.data**2
+                    diff = diff.sum(axis=1)
+                    diff = diff**0.5
+                else:
+                    #default to sum
+                    diff = diff.sum(axis=1)
 
-            rhs_slice = X_csr[(i+1):, :].tocoo()
+                upper_tri_vals.append(diff)
+        else:
+            #loop [0,m-1) because don't need the final corner (since it is 0 in sim)
+            for i in range(m-1):
+                #get the appropriate slices
+                lhs_slice = X_csr[i, :]
+                lhs_data = np.tile(lhs_slice.data, (m-1)-i)
+                lhs_cols = np.tile(lhs_slice.indices, (m-1)-i)
+                lhs_rows = np.repeat(
+                    np.arange(
+                        start=0,
+                        stop=(m-1)-i
+                    ),
+                    repeats=lhs_slice.data.shape[0]
+                )
+                lhs_slice = coo_matrix((lhs_data, (lhs_rows, lhs_cols)), shape=((m-1)-i, n))
 
-            #take difference between slices, abs, then sum axis=1
-            diff = lhs_slice - rhs_slice #TODO TRY WITH CSR?, TRY DIFFERENT ENCODING?
-            diff.data = np.absolute(diff.data)
-            diff = diff.sum(axis=1)
+                rhs_slice = X_csr[(i+1):, :]
 
-            upper_tri_vals.append(diff)
+                #take difference between slices, abs, then sum axis=1
+                diff = lhs_slice.tocsr() - rhs_slice #csr is fastest from tests
+                diff.data = np.absolute(diff.data)
+
+                if save_name is not None: #save before the aggregation
+                    saved_stacks.append(diff)
+
+                #agg based on string
+                if agg == 'sum':
+                    diff = diff.sum(axis=1)
+                elif agg == 'avg':
+                    diff = diff.mean(axis=1)
+                elif agg == 'sqrt(sum_of_squares)':
+                    diff.data = diff.data**2
+                    diff = diff.sum(axis=1)
+                    diff = np.asarray(diff)**0.5
+                else:
+                    #default to sum
+                    diff = diff.sum(axis=1)
+
+                upper_tri_vals.append(diff)
 
         #convert to a long 1D numpy array
         upper_tri_vals = np.concatenate(upper_tri_vals)
 
+        if save_name is not None:
+            lu.save_pickle_workaround('{}_diff_tm{}'.format(save_name, t_cur), \
+                saved_stacks, 'saved_diff_stacks')
+
         return upper_tri_vals
 
-    def fit(self, X_correct_latest, X_correct_cnt_latest, X_incorrect_cnt_latest, \
-        w_correct, w_incorrect, agg):
+    def fit(self, t_cur, X_correct_latest, X_correct_cnt_latest, X_incorrect_cnt_latest, w_correct, w_incorrect, agg, load, save):
         '''
         Calculate similarity matrix based on the correct_cnt_latest and
         incorrect_cnt_latest
         Inputs:
+            t_cur: current tm
             X_correct_latest: 2D sparse coo holding the current 0/1 correct/not
                 at t_cur, here it is set to self.X purely for pred() to calc
                 predictions given the similarity that will be generated here
@@ -449,7 +493,6 @@ class NN_custom_withweights_Learner(Learner):
         Ouputs:
             self.sim: mxm similarity dense matrix using custom similarity
         '''
-        #TODO: utilize agg?
         '''UNCOMMENT ENCLOSED FOR TESTING'''
         # import ipdb; ipdb.set_trace()
         # X_correct_latest = np.zeros(1)
@@ -468,6 +511,10 @@ class NN_custom_withweights_Learner(Learner):
         #     (data_incor, (rows_incor, cols_incor)), shape=(5,4)
         # )
         '''END TESTING'''
+        #for labelling
+        self.w_cor = w_correct
+        self.w_incor = w_incorrect
+        self.agg = agg
 
         #for pred
         self.X = X_correct_latest
@@ -479,9 +526,29 @@ class NN_custom_withweights_Learner(Learner):
         #initialize the dist matrix to be dense zeros size stud x stud
         dist = np.zeros((m, m))
 
-        #create the LHS and RHS stacks for correct and incorrects as coo sparses
-        cor_dist = self.create_sparse_stack(X_correct_cnt_latest)
-        incor_dist = self.create_sparse_stack(X_incorrect_cnt_latest)
+        #if any student has gotten a problem-step correct, it is 1, else 0
+        X_correct_cnt_latest.data = X_correct_cnt_latest.data > 0
+
+        #TODO put in a method
+        if load:
+            save_name_cor = None
+            save_name_incor = None
+            load_name_cor = 'cor'
+            load_name_incor = 'incor'
+        else:
+            save_name_cor = 'cor'
+            save_name_incor = 'incor'
+            load_name_cor = None
+            load_name_incor = None
+        if not(save):
+            save_name_cor = None
+            save_name_incor = None
+            load_name_cor = None
+            load_name_incor = None
+
+        #create the LHS and RHS stacks for correct and incorrects as coo sparses TODO change load_name here
+        cor_dist = self.create_sparse_stack(X_correct_cnt_latest, agg, t_cur, save_name_cor, load_name_cor)
+        incor_dist = self.create_sparse_stack(X_incorrect_cnt_latest, agg, t_cur, save_name_incor, load_name_incor)
 
         #multiply by weights, add them together for distance, turn into upper
         #triangular starting from the first spot NOT in diagonal
