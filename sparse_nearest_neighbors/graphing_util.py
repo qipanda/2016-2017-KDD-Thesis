@@ -6,13 +6,15 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 import math
 
-def plot_test_2D_sparse_results(results, x_range_col, label_col, value_cols, starting_figure):
+def plot_test_2D_sparse_results(results, x_range_col, label_col, value_cols, starting_figure, y_ticks=None):
     '''
     Inputs:
         [results] = list of dataframes that contain the results
         label_col = name of the col seperate difference methods
         [value_cols] = list of different valued graphs to plot
     '''
+    if y_ticks is None:
+        y_ticks = 0+np.arange(26)*0.04
     #get the xrange from an arbitrary result (all should be same)
     x_range = results[0][x_range_col]
 
@@ -26,7 +28,7 @@ def plot_test_2D_sparse_results(results, x_range_col, label_col, value_cols, sta
         plt.xlabel(x_range_col)
         plt.ylabel(value)
         plt.xticks(x_range)
-        plt.yticks(0+np.arange(26)*0.04) #% from 70% to 100%
+        plt.yticks(y_ticks)
         plt.title('{} by {}'.format(value, x_range_col))
         plt.grid()
         plt.show()

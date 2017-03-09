@@ -185,12 +185,13 @@ class DataManipulator(object):
 
         t0 = time.time()
         for t_cur in range(tm_orders_totest):
-            ftrs = {
-                't_cur':t_cur
-            }
+            ftrs = {}
+            # ftrs['t_cur'] = t_cur
+
             for ftr in ftr_names:
-                ftrs[ftr] = self.sparse_ftrs[ftr][t_cur]
-            
+                # ftrs[ftr] = self.sparse_ftrs[ftr][t_cur]
+                ftrs['X'] = self.sparse_ftrs[ftr][t_cur]
+
             learner.fit(**ftrs, **fit_params)
             preds, actls = learner.pred(self.sparse_ftrs[answers_name][t_cur+1], **pred_params)
 

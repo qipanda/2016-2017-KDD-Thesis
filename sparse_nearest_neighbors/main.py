@@ -161,18 +161,18 @@ def test_baselines():
     '''Test Baselines'''
     test_results = []
 
-    #Uniform_Random_Learner
-    test_2D_sparse_params = {
-        'Learner':Learners.Uniform_Random_Learner,
-        'tm_orders_totest':tm_orders_totest,
-        'ftr_names':['X_correct_latest'],
-        'answers_name':'X_correct',
-        'fit_params':{},
-        'pred_params':{
-            'threshold':0.5
-        }
-    }
-    test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+    # #Uniform_Random_Learner
+    # test_2D_sparse_params = {
+    #     'Learner':Learners.Uniform_Random_Learner,
+    #     'tm_orders_totest':tm_orders_totest,
+    #     'ftr_names':['X_correct_latest'],
+    #     'answers_name':'X_correct',
+    #     'fit_params':{},
+    #     'pred_params':{
+    #         'threshold':0.5
+    #     }
+    # }
+    # test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
 
     #Global_Average_Learner
     test_2D_sparse_params = {
@@ -239,8 +239,9 @@ def info():
 
 if __name__ == '__main__':
     # pool = mp.Pool(processes=6)
-    # dm = load_preprocessed_ftrs()
-    # test_results = []
+    dm = load_preprocessed_ftrs()
+    test_results = []
+    tm_orders_totest = 20
     # test_results.append(test_baselines())
 
     # '''3.) Test NN methods'''
@@ -257,7 +258,7 @@ if __name__ == '__main__':
     # }
     # test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
     #
-    # #NN cosine with 0/1 encoding in X but simdiags = 0
+    #NN cosine with 0/1 encoding in X but simdiags = 0
     # test_2D_sparse_params = {
     #     'Learner':Learners.NN_cos_noselfsim_Learner,
     #     'tm_orders_totest':tm_orders_totest,
@@ -270,7 +271,7 @@ if __name__ == '__main__':
     # }
     # test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
     #
-    # #NN_cosine with -1/0/1 encoding in X (-1 for incorrects instead of 0)
+    #NN_cosine with -1/0/1 encoding in X (-1 for incorrects instead of 0)
     # test_2D_sparse_params = {
     #     'Learner':Learners.NN_cos_encode_wrong_Learner,
     #     'tm_orders_totest':tm_orders_totest,
@@ -332,6 +333,28 @@ if __name__ == '__main__':
     #     'ftr_name':'X_cor_and_incor_cnt'
     # }
 
+    #different hyperparams
+    import ipdb; ipdb.set_trace()
+
+    #Within_XRow_Avg_Learner (within each Student)
+    test_2D_sparse_params = {
+        'Learner':Learners.Within_XRow_Avg_Learner,
+        'tm_orders_totest':tm_orders_totest,
+        'ftr_names':['X_correct_latest'],
+        'answers_name':'X_correct',
+        'fit_params':{},
+        'pred_params':{
+            'threshold':0.5
+        }
+    }
+
+    thresholds = [0.2, 0.35, 0.5, 0.65, 0.8]
+    for thresh in thresholds:
+        test_2D_sparse_params['pred_params']['threshold'] = thresh
+        test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+
+    lu.save_pickle('varthresh_rowavg', test_results, 'hyperparam_tuning_results')
+
     import ipdb; ipdb.set_trace()
     '''Run multiple tests in parralell CANT BE RUN WITH IPDB'''
     # w_incors = [0.1, 1.0, 10.0]
@@ -346,41 +369,41 @@ if __name__ == '__main__':
     #
     # lu.save_pickle('custdost_25tm_overall_results', results, 'results')
 
-    # '''4.) calculate/graph results'''
-    # plot_test_2D_sparse_results_params = {
-    #     'results':test_results,
-    #     'x_range_col':'t_cur',
-    #     'label_col':'Learner Name',
-    #     'value_cols':['Accuracy', 'Positive Predictive Value', 'Negative Predictive Value',\
-    #         'True Positive Rate', 'True Negative Rate'],
-    #     'starting_figure':0
-    # }
-    # gu.plot_test_2D_sparse_results(**plot_test_2D_sparse_results_params)
+    '''4.) calculate/graph results'''
+    plot_test_2D_sparse_results_params = {
+        'results':test_results,
+        'x_range_col':'t_cur',
+        'label_col':'Learner Name',
+        'value_cols':['Accuracy', 'Positive Predictive Value', 'Negative Predictive Value',\
+            'True Positive Rate', 'True Negative Rate'],
+        'starting_figure':0
+    }
+    gu.plot_test_2D_sparse_results(**plot_test_2D_sparse_results_params)
 
     '''plot in a 3x3 grid the test results of cust_dist'''
-    aggs = ['sum', 'avg', 'sqrt(sum_of_squares)']
-    wincors = ['10pt0', '1pt0', '0pt1']
-    x_range = np.arange(20)
-    y_ticks = 0.70 + np.arange(31)*0.01
-
-    f, axarr = plt.subplots(nrows=3, ncols=3, sharex=True, sharey=True)
-    for i, agg in enumerate(aggs):
-        for j, wincor in enumerate(wincors):
-            #load the 3 results of diff wincors
-            th0pt3 = lu.load_pickle('custdist_20tm_wincor{}_agg{}_th0pt3'.format(wincor, agg), 'results_parallel')
-            th0pt5 = lu.load_pickle('custdist_20tm_wincor{}_agg{}_th0pt5'.format(wincor, agg), 'results_parallel')
-            th0pt7 = lu.load_pickle('custdist_20tm_wincor{}_agg{}_th0pt7'.format(wincor, agg), 'results_parallel')
-
-            #plot in subplot i,j
-            axarr[i, j].plot(x_range, th0pt3.loc[:, 'Accuracy'], label='wincor={}|agg={}|thresh=0pt3'.format(wincor, agg))
-            axarr[i, j].plot(x_range, th0pt5.loc[:, 'Accuracy'], label='wincor={}|agg={}|thresh=0pt5'.format(wincor, agg))
-            axarr[i, j].plot(x_range, th0pt7.loc[:, 'Accuracy'], label='wincor={}|agg={}|thresh=0pt7'.format(wincor, agg))
-
-            axarr[i, j].legend(loc='best', prop={'size':5})
-            axarr[i, j].set_xlabel('tm')
-            axarr[i, j].set_ylabel('acc')
-            axarr[i, j].set_xticks(x_range)
-            axarr[i, j].set_yticks(y_ticks)
-            axarr[i, j].grid()
-
-    plt.show()
+    # aggs = ['sum', 'avg', 'sqrt(sum_of_squares)']
+    # wincors = ['10pt0', '1pt0', '0pt1']
+    # x_range = np.arange(20)
+    # y_ticks = 0.70 + np.arange(31)*0.01
+    #
+    # f, axarr = plt.subplots(nrows=3, ncols=3, sharex=True, sharey=True)
+    # for i, agg in enumerate(aggs):
+    #     for j, wincor in enumerate(wincors):
+    #         #load the 3 results of diff wincors
+    #         th0pt3 = lu.load_pickle('custdist_20tm_wincor{}_agg{}_th0pt3'.format(wincor, agg), 'results_parallel')
+    #         th0pt5 = lu.load_pickle('custdist_20tm_wincor{}_agg{}_th0pt5'.format(wincor, agg), 'results_parallel')
+    #         th0pt7 = lu.load_pickle('custdist_20tm_wincor{}_agg{}_th0pt7'.format(wincor, agg), 'results_parallel')
+    #
+    #         #plot in subplot i,j
+    #         axarr[i, j].plot(x_range, th0pt3.loc[:, 'Accuracy'], label='wincor={}|agg={}|thresh=0pt3'.format(wincor, agg))
+    #         axarr[i, j].plot(x_range, th0pt5.loc[:, 'Accuracy'], label='wincor={}|agg={}|thresh=0pt5'.format(wincor, agg))
+    #         axarr[i, j].plot(x_range, th0pt7.loc[:, 'Accuracy'], label='wincor={}|agg={}|thresh=0pt7'.format(wincor, agg))
+    #
+    #         axarr[i, j].legend(loc='best', prop={'size':5})
+    #         axarr[i, j].set_xlabel('tm')
+    #         axarr[i, j].set_ylabel('acc')
+    #         axarr[i, j].set_xticks(x_range)
+    #         axarr[i, j].set_yticks(y_ticks)
+    #         axarr[i, j].grid()
+    #
+    # plt.show()

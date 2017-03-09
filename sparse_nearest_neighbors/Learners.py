@@ -686,7 +686,7 @@ class Within_XRow_Avg_Learner(Learner):
         self.threshold = threshold
 
     def __str__(self):
-        return 'Within_XRow_Avg_Learner'
+        return 'Within_XRow_Avg_Learner|thresh={}'.format(self.threshold)
 
     def fit(self, X):
         self.X = X
