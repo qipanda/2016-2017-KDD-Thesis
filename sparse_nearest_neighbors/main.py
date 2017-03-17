@@ -271,7 +271,7 @@ if __name__ == '__main__':
     # }
     # test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
     #
-    #NN_cosine with -1/0/1 encoding in X (-1 for incorrects instead of 0)
+    # #NN_cosine with -1/0/1 encoding in X (-1 for incorrects instead of 0)
     # test_2D_sparse_params = {
     #     'Learner':Learners.NN_cos_encode_wrong_Learner,
     #     'tm_orders_totest':tm_orders_totest,
@@ -314,7 +314,7 @@ if __name__ == '__main__':
     # }
     # test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
 
-    #NN with custom encoding using correct_cnt and incorrect_cnt
+    # # NN with custom encoding using correct_cnt and incorrect_cnt
     # test_2D_sparse_params = {
     #     'Learner':Learners.NN_custom_withweights_Learner,
     #     'tm_orders_totest':20,
@@ -336,24 +336,33 @@ if __name__ == '__main__':
     #different hyperparams
     import ipdb; ipdb.set_trace()
 
-    #Within_XRow_Avg_Learner (within each Student)
+    # NN with custom encoding using correct_cnt and incorrect_cnt
     test_2D_sparse_params = {
-        'Learner':Learners.Within_XRow_Avg_Learner,
-        'tm_orders_totest':tm_orders_totest,
-        'ftr_names':['X_correct_latest'],
+        'Learner':Learners.NN_custom_withweights_Learner,
+        'tm_orders_totest':20,
+        'ftr_names':['X_correct_latest', 'X_correct_cnt_latest', 'X_incorrect_cnt_latest'],
         'answers_name':'X_correct',
-        'fit_params':{},
+        'fit_params':{
+            'w_correct':1.0,
+            'w_incorrect':10.0,
+            'agg':'sqrt(sum_of_squares)',
+            'load':False,
+            'save':False
+        },
         'pred_params':{
             'threshold':0.5
-        }
+        },
+        'ftr_name':'X_cor_and_incor_cnt'
     }
 
-    thresholds = [0.2, 0.35, 0.5, 0.65, 0.8]
-    for thresh in thresholds:
-        test_2D_sparse_params['pred_params']['threshold'] = thresh
-        test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+    dm.test_2D_sparse(**test_2D_sparse_params)
 
-    lu.save_pickle('varthresh_rowavg', test_results, 'hyperparam_tuning_results')
+    # thresholds = [0.2, 0.35, 0.5, 0.65, 0.8]
+    # for thresh in thresholds:
+    #     test_2D_sparse_params['pred_params']['threshold'] = thresh
+    #     test_results.append(dm.test_2D_sparse(**test_2D_sparse_params))
+    #
+    # lu.save_pickle('varthresh_rowavg', test_results, 'hyperparam_tuning_results')
 
     import ipdb; ipdb.set_trace()
     '''Run multiple tests in parralell CANT BE RUN WITH IPDB'''

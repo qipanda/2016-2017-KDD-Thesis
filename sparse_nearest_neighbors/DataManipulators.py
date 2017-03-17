@@ -185,15 +185,19 @@ class DataManipulator(object):
 
         t0 = time.time()
         for t_cur in range(tm_orders_totest):
+            #FOR DEBUGGING, SET TO 0 FOR NO EFFECT
+            buffer = 18
+
             ftrs = {}
-            # ftrs['t_cur'] = t_cur
+            ftrs['t_cur'] = t_cur #comment our for non cust methods
 
             for ftr in ftr_names:
-                # ftrs[ftr] = self.sparse_ftrs[ftr][t_cur]
-                ftrs['X'] = self.sparse_ftrs[ftr][t_cur]
+                ftrs[ftr] = self.sparse_ftrs[ftr][t_cur+buffer]
+                # ftrs['X'] = self.sparse_ftrs[ftr][t_cur+buffer]
 
+            import ipdb; ipdb.set_trace()
             learner.fit(**ftrs, **fit_params)
-            preds, actls = learner.pred(self.sparse_ftrs[answers_name][t_cur+1], **pred_params)
+            preds, actls = learner.pred(self.sparse_ftrs[answers_name][t_cur+1+buffer], **pred_params)
 
             #calculate TP, TN, FP, FN
             tp = np.sum(preds[actls==1] == actls[actls==1])
